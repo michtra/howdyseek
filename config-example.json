@@ -1,0 +1,21 @@
+{
+	"https://discordapp.com/api/webhooks/not_a_real_webhook": [
+		{
+			"prof": "Ning, Patricia",
+			"course": "STAT 212",
+			"crn": "41051"
+		},
+		{
+			"prof": "KEBO",
+			"course": "CSCE 313",
+			"crn": "12361"
+		}
+	],
+	"another webhook for friends": [
+		{
+			"prof": "Jesse A. Chupp",
+			"course": "POLS 207",
+			"crn": "11924"
+		}
+	]
+}
