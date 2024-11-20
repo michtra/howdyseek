@@ -3,8 +3,8 @@ import json
 from time import sleep
 import requests
 import random
+import traceback
 
-import selenium.common.exceptions
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
@@ -111,17 +111,18 @@ if __name__ == "__main__":
     while True:
         for i in driver.window_handles:
             try:
+                # one of these windows may raise an exception because it's not a valid page
                 driver.switch_to.window(i)
+                # otherwise proceed as usual
+                driver.refresh()
                 try:
-                    # one of these windows may error with the following
-                    # it will raise an exception because it's not a valid page
-                    table = driver.find_element(By.XPATH, '//*[@id="enabled_panel"]/div/table')
-                    # otherwise proceed as usual
-                    check_sections()
-                    sleep(1)
-                    driver.refresh()
-                except selenium.common.exceptions.NoSuchElementException:
+                    # wait if we can. otherwise we'll still just run the sections checker
+                    WebDriverWait(driver, 3).until(EC.presence_of_element_located(
+                        (By.XPATH, '//*[@id="enabled_panel"]/div/table')))
+                except Exception as e:
                     pass
-            except selenium.common.exceptions.NoSuchWindowException:
+                check_sections()
+            except Exception as e:
+                traceback.print_exc()
                 pass
-        sleep(random.uniform(25, 35))
+        sleep(random.uniform(15, 25))
