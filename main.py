@@ -48,10 +48,10 @@ def create_tabs():
             driver.get(
                 "https://tamu.collegescheduler.com/terms/Spring%202025%20-%20College%20Station/options")
 
-        WebDriverWait(driver, 3).until(EC.presence_of_element_located(
+        WebDriverWait(driver, 20).until(EC.presence_of_element_located(
             (By.XPATH, '//*[@id="scheduler-app"]/div/main/div/div/div[1]/div/div[4]/div[1]/div[1]/div[1]/div/div[2]')))
 
-        WebDriverWait(driver, 3).until(EC.presence_of_element_located(
+        WebDriverWait(driver, 20).until(EC.presence_of_element_located(
             (By.XPATH, '//*[@id="scheduler-app"]/div/main/div/div/div[2]/div[1]/div/div[2]/table')))
 
         # now we need to load course section information for each course
@@ -92,7 +92,8 @@ def check_sections():
                 course = section["course"]
                 prof = section["prof"]
 
-                notify(webhook, "SEATS AVAILABLE", f'{course} with {prof} is available.\nCRN: {crn}\nAggie Schedule Builder: https://tamu.collegescheduler.com/terms/Spring%202025%20-%20College%20Station/options')
+                notify(webhook, "SEATS AVAILABLE",
+                       f'{course} with {prof} is available.\nCRN: {crn}\nAggie Schedule Builder: https://tamu.collegescheduler.com/terms/Spring%202025%20-%20College%20Station/options')
 
 
 def notify(webhook, title, description):
@@ -115,14 +116,21 @@ if __name__ == "__main__":
                 driver.switch_to.window(i)
                 # otherwise proceed as usual
                 driver.refresh()
+                
+                # wait function
                 try:
-                    # wait if we can. otherwise we'll still just run the sections checker
-                    WebDriverWait(driver, 3).until(EC.presence_of_element_located(
+                    # this spinner takes a long time sometimes but it should be what we wait for
+                    WebDriverWait(driver, 10).until(EC.invisibility_of_element_located(
+                        (By.CLASS_NAME, 'spinner')))
+                    # wait for this if we can. sometimes it doesn't show up (?)
+                    # otherwise we'll still just run the sections checker
+                    WebDriverWait(driver, 1).until(EC.presence_of_element_located(
                         (By.XPATH, '//*[@id="enabled_panel"]/div/table')))
-                except Exception as e:
+                except Exception:
                     pass
+
                 check_sections()
             except Exception as e:
                 traceback.print_exc()
                 pass
-        sleep(random.uniform(15, 25))
+        sleep(random.uniform(15, 25))  # or 30, 40
