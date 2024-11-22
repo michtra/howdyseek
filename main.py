@@ -114,8 +114,16 @@ if __name__ == "__main__":
             try:
                 # one of these windows may raise an exception because it's not a valid page
                 driver.switch_to.window(i)
-                # otherwise proceed as usual
-                driver.refresh()
+
+                # howdyseek is indestructible!
+                invalid_string = "invalid.aspx?aspxerrorpath=/"
+                if invalid_string in driver.current_url:
+                    url = driver.current_url
+                    url = url.replace(invalid_string, "")
+                    print("Page error detected. Redirecting to " + url)
+                    driver.get(url)
+                else:
+                    driver.refresh()
                 
                 # wait function
                 try:
@@ -128,7 +136,8 @@ if __name__ == "__main__":
                         (By.XPATH, '//*[@id="enabled_panel"]/div/table')))
                 except Exception:
                     pass
-
+                # must delay to have time to check sections
+                sleep(0.5)
                 check_sections()
             except Exception as e:
                 traceback.print_exc()

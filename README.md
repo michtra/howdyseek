@@ -21,7 +21,18 @@ a term selection again. Therefore, the term has to be selected on the initial pa
 - A: in honor of my permanent IP ban from howdy.tamu.edu and compass-ssb.tamu.edu (those who know 💀💀💀) (don't self-host [better-aggieseek](https://github.com/michtra/better-aggieseek) 💀💀💀💀)
 
 - Q: is howdyseek really that good?
-- A: yes
+- A: yes. proof below
+
+Proof: Assume, for the sake of contradiction, that HowdySeek is not the best course seat tracker. Then there must exist some tracker X such that X is better than HowdySeek. However, by the definition of HowdySeek, for all trackers X, HowdySeek is literally the best. This contradicts the assumption that such an X exists.
+
+Therefore, our assumption must be false, and HowdySeek is indeed the best course seat tracker. Q.E.D.
+
+## Current howdyseek W count: 5
+1. STAT 212 with Patricia Ning (11am section > all)
+2. CSCE 221 with Beideman (Beideman the GOAT)
+3. ECEN 214 with Butler-Parry Karen (ECEN majors just can't compete with the CS majors)
+4. PBSI 235 with Madison (Neuroscience lovers just can't compete with the CS majors)
+5. Last but not least, most notable win: STAT 211 with Crawford (Web-based W with the GOAT)
 
 # Setup
 - Install requirements from requirements.txt (`pip install -r requirements.txt`)
