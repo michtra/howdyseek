@@ -69,7 +69,18 @@ def check_sections():
     # firstly let us extract the crns of each course and the seats open for each course
     # recall that this is only on the enabled page
     section_info = {}
+
+    # respectfully, this mogs any other waits
+    # pair this with the offscreen_compiled.js skip.
+    WebDriverWait(driver, 20).until(EC.presence_of_element_located(
+        (By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')))
+
     labels = driver.find_elements(By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')
+    if len(labels) < 6:  # shouldn't ever happen
+        source_code = driver.page_source
+        with open("page_source.html", "w", encoding="utf-8") as file:
+            file.write(source_code)
+        print("Error: no classes found. Source saved.")
     # cool pattern: the CRN is every 6, and the seats open is every CRN index plus 3
     # :-)
     for label in range(0, len(labels), 6):
@@ -112,8 +123,10 @@ if __name__ == "__main__":
     while True:
         for i in driver.window_handles:
             try:
-                # one of these windows may raise an exception because it's not a valid page
                 driver.switch_to.window(i)
+                # random invalid page lol. skip cause it messes up everything
+                if "offscreen_compiled.js" in driver.page_source:
+                    continue
 
                 # howdyseek is indestructible!
                 invalid_string = "invalid.aspx?aspxerrorpath=/"
@@ -124,20 +137,7 @@ if __name__ == "__main__":
                     driver.get(url)
                 else:
                     driver.refresh()
-                
-                # wait function
-                try:
-                    # this spinner takes a long time sometimes but it should be what we wait for
-                    WebDriverWait(driver, 10).until(EC.invisibility_of_element_located(
-                        (By.CLASS_NAME, 'spinner')))
-                    # wait for this if we can. sometimes it doesn't show up (?)
-                    # otherwise we'll still just run the sections checker
-                    WebDriverWait(driver, 1).until(EC.presence_of_element_located(
-                        (By.XPATH, '//*[@id="enabled_panel"]/div/table')))
-                except Exception:
-                    pass
-                # must delay to have time to check sections
-                sleep(0.5)
+
                 check_sections()
             except Exception as e:
                 traceback.print_exc()
