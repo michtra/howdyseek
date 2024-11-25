@@ -20,6 +20,9 @@ a term selection again. Therefore, the term has to be selected on the initial pa
 - Q: Why is the name of this 'howdyseek?'
 - A: in honor of my permanent IP ban from howdy.tamu.edu and compass-ssb.tamu.edu (those who know 💀💀💀) (don't self-host [better-aggieseek](https://github.com/michtra/better-aggieseek) 💀💀💀💀)
 
+- Q: Is howdyseek bulletproof
+- A: yuh
+
 - Q: is howdyseek really that good?
 - A: yes. proof below
 
@@ -49,4 +52,5 @@ Therefore, our assumption must be false, and HowdySeek is indeed the best course
 
 # Usage
 - Make sure you don't have another instance of Chromium open
+- The script may not work properly if the Chromium window is not fully expanded (doesn't have to be focused/in view though, just maximized)
 - Run the python script

@@ -65,28 +65,64 @@ def create_tabs():
                 break  # break or else stale element
 
 
-def check_sections():
+# page source save counter
+count = 1
+
+
+def save_source(error):
+    global count
+    file_name = f"page_source{count}.html"
+    with open(file_name, "w", encoding="utf-8") as source_file:
+        source_file.write(driver.page_source)
+        count += 1
+    print(f"Error: {error}. Page source saved to " + file_name)
+
+
+# howdyseek is literally indestructible
+def redirect_if_invalid():
+    invalid_string = "invalid.aspx?aspxerrorpath=/"
+    if invalid_string in driver.current_url:
+        url = driver.current_url
+        url = url.replace(invalid_string, "")
+        print("Page error detected. Redirecting to " + url)
+        driver.get(url)
+        return True
+    return False
+
+
+def check_sections(current_link):
     # firstly let us extract the crns of each course and the seats open for each course
     # recall that this is only on the enabled page
     section_info = {}
 
     # respectfully, this mogs any other waits
     # pair this with the offscreen_compiled.js skip.
-    WebDriverWait(driver, 20).until(EC.presence_of_element_located(
-        (By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')))
+    success = False
+    while not success:
+        try:
+            WebDriverWait(driver, 10).until(EC.presence_of_element_located(
+                (By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')))
+            success = True
+        except:
+            if redirect_if_invalid():
+                save_source("invalid page")
+            # backup check
+            else:
+                driver.get(current_link)
+                save_source("fatal error")
 
     labels = driver.find_elements(By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')
     if len(labels) < 6:  # shouldn't ever happen
-        source_code = driver.page_source
-        with open("page_source.html", "w", encoding="utf-8") as file:
-            file.write(source_code)
-        print("Error: no classes found. Source saved.")
+        save_source("no classes found")
     # cool pattern: the CRN is every 6, and the seats open is every CRN index plus 3
     # :-)
     for label in range(0, len(labels), 6):
         crn = labels[label].text
         seats = labels[label + 3].text
         section_info[crn] = seats
+
+    if len(section_info) == 0:  # also shouldn't ever happen
+        save_source("no classes found (2)")
 
     # loop through all courses in each webhook and find matches
     for webhook, classes in data.items():
@@ -120,6 +156,9 @@ def notify(webhook, title, description):
 
 if __name__ == "__main__":
     create_tabs()
+    # links dictionary for each tab.
+    # created because a page may error and the corresponding course url to the page may be lost
+    links = {}
     while True:
         for i in driver.window_handles:
             try:
@@ -128,17 +167,16 @@ if __name__ == "__main__":
                 if "offscreen_compiled.js" in driver.page_source:
                     continue
 
-                # howdyseek is indestructible!
-                invalid_string = "invalid.aspx?aspxerrorpath=/"
-                if invalid_string in driver.current_url:
-                    url = driver.current_url
-                    url = url.replace(invalid_string, "")
-                    print("Page error detected. Redirecting to " + url)
-                    driver.get(url)
-                else:
+                # dictionary should be created successfully on the first iteration
+                if i not in links:
+                    links[i] = driver.current_url
+                current_link = links[i]
+
+                # if not refreshed from an invalid page then refresh
+                if not redirect_if_invalid():
                     driver.refresh()
 
-                check_sections()
+                check_sections(current_link)
             except Exception as e:
                 traceback.print_exc()
                 pass
