@@ -5,6 +5,7 @@ import requests
 import random
 import traceback
 
+import selenium.common.exceptions
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
@@ -104,10 +105,13 @@ def check_sections(current_link):
                 (By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')))
             success = True
         except:
-            if redirect_if_invalid():
-                save_source("invalid page")
-            # backup check
-            else:
+            # if didn't load for long enough, refresh and retry
+            if driver.find_elements(By.CLASS_NAME, 'css-oa2o6p-h3Css'):
+                driver.get(current_link)
+            # otherwise, at this point, there's a cause for concern
+            # it loaded long enough but there's an invalid page
+            # if it was not an invalid page, then save the source to check it out later
+            elif not redirect_if_invalid():
                 driver.get(current_link)
                 save_source("fatal error")
 
@@ -177,6 +181,8 @@ if __name__ == "__main__":
                     driver.refresh()
 
                 check_sections(current_link)
+            except selenium.common.exceptions.NoSuchWindowException:
+                pass
             except Exception as e:
                 traceback.print_exc()
                 pass
