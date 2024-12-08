@@ -105,15 +105,8 @@ def check_sections(current_link):
                 (By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')))
             success = True
         except:
-            # if didn't load for long enough, refresh and retry
-            if driver.find_elements(By.CLASS_NAME, 'css-oa2o6p-h3Css'):
-                driver.get(current_link)
-            # otherwise, at this point, there's a cause for concern
-            # it loaded long enough but there's an invalid page
-            # if it was not an invalid page, then save the source to check it out later
-            elif not redirect_if_invalid():
-                driver.get(current_link)
-                save_source("fatal error")
+            # refresh and retry
+            driver.get(current_link)
 
     labels = driver.find_elements(By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')
     if len(labels) < 6:  # shouldn't ever happen
@@ -186,4 +179,4 @@ if __name__ == "__main__":
             except Exception as e:
                 traceback.print_exc()
                 pass
-        sleep(random.uniform(15, 25))  # or 30, 40
+        sleep(random.uniform(30, 40))  # or 30, 40
