@@ -66,19 +66,6 @@ def create_tabs():
                 break  # break or else stale element
 
 
-# page source save counter
-count = 1
-
-
-def save_source(error):
-    global count
-    file_name = f"page_source{count}.html"
-    with open(file_name, "w", encoding="utf-8") as source_file:
-        source_file.write(driver.page_source)
-        count += 1
-    print(f"Error: {error}. Page source saved to " + file_name)
-
-
 # howdyseek is literally indestructible
 def redirect_if_invalid():
     invalid_string = "invalid.aspx?aspxerrorpath=/"
@@ -91,35 +78,84 @@ def redirect_if_invalid():
     return False
 
 
+def has_no_sections():
+    if driver.find_elements(By.XPATH, '//*[@id="scheduler-app"]/div/main/div/div/div[2]/ul/li[1]/a/span'):
+        text = driver.find_element(By.XPATH, '//*[@id="scheduler-app"]/div/main/div/div/div[2]/ul/li[1]/a/span').text
+        return text == "Enabled (0 of 0)"
+    return False
+
+
 def check_sections(current_link):
     # firstly let us extract the crns of each course and the seats open for each course
     # recall that this is only on the enabled page
+    # we can extract section information only if there are sections available to extract
+    # thus we first must wait an adequate amount of time for section information to appear
     section_info = {}
 
-    # respectfully, this mogs any other waits
-    # pair this with the offscreen_compiled.js skip.
+    no_sections = [
+        "5868826",  # STAT 315
+        "5868823"  # PHYS 222
+    ]
+
     success = False
-    while not success:
-        try:
-            WebDriverWait(driver, 10).until(EC.presence_of_element_located(
-                (By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')))
-            success = True
-        except:
-            # refresh and retry
-            driver.get(current_link)
+    # two different waits
+    # wait #1 is for classes that currently have no sections available in the "Enabled" tab
+    # we can assume that they probably still don't have sections so we wait a shorter amount of time for them
+    if current_link.split('/')[-1] in no_sections:
+        while not success:
+            try:
+                # wait only 3 seconds to see if section information appears
+                WebDriverWait(driver, 3).until(EC.presence_of_element_located(
+                    (By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')))
+                success = True
+            except:
+                # at this point, there is no section information.
+                # the page may be errored out or there are simply no sections
+
+                # do error handling before checking if sections are available
+                if "invalid request" in driver.page_source:
+                    # refresh if invalid request
+                    driver.get(current_link)
+                if driver.find_element(By.CLASS_NAME, 'spinner'):
+                    # or refresh if still loading / erroring out
+                    driver.get(current_link)
+
+                # check if there are no sections available
+                if has_no_sections():
+                    # break and don't toggle success to True
+                    break
+    # wait #2 is for normal classes with at least one section available
+    else:
+        # unlike the previous one, we should wait longer for a section element to show up
+        # if a section element doesn't show up, it's an errored page, just refresh
+        while not success:
+            try:
+                # wait for the first section to show up on screen
+                # we can assume all the other sections show up as well at the same time
+                WebDriverWait(driver, 10).until(EC.presence_of_element_located(
+                    (By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')))
+                success = True
+            except:
+                # in the case that there are no sections
+                if has_no_sections():
+                    # break and don't toggle success to True
+                    break
+
+                # otherwise refresh and retry. could be a page error or just a timeout
+                driver.get(current_link)
+
+    # at this point, success is True. there are sections to check.
+    # but if it's False, it's because there are no sections available from wait #1. Skip this class.
+    if not success:
+        return
 
     labels = driver.find_elements(By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')
-    if len(labels) < 6:  # shouldn't ever happen
-        save_source("no classes found")
     # cool pattern: the CRN is every 6, and the seats open is every CRN index plus 3
     # :-)
     for label in range(0, len(labels), 6):
         crn = labels[label].text
         seats = labels[label + 3].text
         section_info[crn] = seats
-
-    if len(section_info) == 0:  # also shouldn't ever happen
-        save_source("no classes found (2)")
 
     # loop through all courses in each webhook and find matches
     for webhook, classes in data.items():
@@ -175,6 +211,8 @@ if __name__ == "__main__":
 
                 check_sections(current_link)
             except selenium.common.exceptions.NoSuchWindowException:
+                pass
+            except selenium.common.exceptions.WebDriverException:
                 pass
             except Exception as e:
                 traceback.print_exc()
