@@ -19,9 +19,16 @@ chrome_options.add_argument('--profile-directory=Default')
 chrome_options.add_experimental_option('detach', True)
 driver = webdriver.Chrome(options=chrome_options)
 
-with open('config.json', 'r') as file:
-    data = json.load(file)
+# loads configuration from the JSON file. allows for config changes on the go;
+# particularly, removing webhooks or adding notifications to preexisting courses on the schedule builder
+def load_config():
+    global data
+    with open('config.json', 'r') as file:
+        data = json.load(file)
+    return data
 
+# initial config load
+data = load_config()
 
 def create_tabs():
     # first let's create a list of all the classes we want
@@ -90,7 +97,7 @@ def check_sections(current_link):
     # recall that this is only on the enabled page
     # we can extract section information only if there are sections available to extract
     # thus we first must wait an adequate amount of time for section information to appear
-    section_info = {}
+    visible_sections = {}
 
     no_sections = [
         "5868826",  # STAT 315
@@ -116,7 +123,7 @@ def check_sections(current_link):
                 if "invalid request" in driver.page_source:
                     # refresh if invalid request
                     driver.get(current_link)
-                if driver.find_element(By.CLASS_NAME, 'spinner'):
+                elif driver.find_element(By.CLASS_NAME, 'spinner'):
                     # or refresh if still loading / erroring out
                     driver.get(current_link)
 
@@ -155,8 +162,10 @@ def check_sections(current_link):
     for label in range(0, len(labels), 6):
         crn = labels[label].text
         seats = labels[label + 3].text
-        section_info[crn] = seats
+        visible_sections[crn] = seats
 
+    global data
+    data = load_config()
     # loop through all courses in each webhook and find matches
     for webhook, classes in data.items():
         for section in classes:
@@ -168,7 +177,7 @@ def check_sections(current_link):
             # there's probably optimization here to be done but it werks
             # maybe optimize with driver.current_url and rfind('/') + 1
 
-            if crn in section_info:
+            if crn in visible_sections:
                 course = section["course"]
                 prof = section["prof"]
 
