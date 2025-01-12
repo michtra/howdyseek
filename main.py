@@ -130,8 +130,7 @@ def check_sections(current_link):
     visible_sections = {}
 
     no_sections = [
-        "5868826",  # STAT 315
-        "5868823"  # PHYS 222
+        "6020115" # PERF 301
     ]
 
     success = False
@@ -142,7 +141,7 @@ def check_sections(current_link):
         while not success:
             try:
                 # wait only 3 seconds to see if section information appears
-                WebDriverWait(driver, 3).until(EC.presence_of_element_located(
+                WebDriverWait(driver, 2).until(EC.presence_of_element_located(
                     (By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')))
                 success = True
             except:
@@ -169,7 +168,7 @@ def check_sections(current_link):
             try:
                 # wait for the first section to show up on screen
                 # we can assume all the other sections show up as well at the same time
-                WebDriverWait(driver, 10).until(EC.presence_of_element_located(
+                WebDriverWait(driver, 5).until(EC.presence_of_element_located(
                     (By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')))
                 success = True
             except:
@@ -201,12 +200,6 @@ def check_sections(current_link):
         for section in classes:
             crn = section["crn"]
             # crn match
-            # recall that only enabled sections are scraped
-            # therefore the crns in section_info will all be available
-
-            # there's probably optimization here to be done but it werks
-            # maybe optimize with driver.current_url and rfind('/') + 1
-
             if crn in visible_sections:
                 # check if this is a new section or if seats have changed
                 prev_seats = section_states[current_course].get(crn, None)
@@ -225,13 +218,14 @@ def check_sections(current_link):
                     section_states[current_course][crn] = current_seats
             # if a section was previously visible but now isn't, it means it now has 0 seats
             elif crn in section_states[current_course]:
-                section_states[current_course][crn] = 0
                 prev_seats = section_states[current_course][crn]
                 if prev_seats > 0:  # only notify if previously seats available
                     course = section["course"]
                     prof = section["prof"]
                     notify(webhook, "Section Full",
                            f'{course} with {prof} is now full.\nCRN: {crn}')
+                # Update state
+                section_states[current_course][crn] = 0
 
 
 def notify(webhook, title, description):
