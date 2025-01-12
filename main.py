@@ -19,6 +19,7 @@ chrome_options.add_argument('--profile-directory=Default')
 chrome_options.add_experimental_option('detach', True)
 driver = webdriver.Chrome(options=chrome_options)
 
+
 # loads configuration from the JSON file. allows for config changes on the go;
 # particularly, removing webhooks or adding notifications to preexisting courses on the schedule builder
 def load_config():
@@ -27,8 +28,11 @@ def load_config():
         data = json.load(file)
     return data
 
+
 # initial config load
 data = load_config()
+course_names = {}  # Format: {url id: course name}
+
 
 def create_tabs():
     # first let's create a list of all the classes we want
@@ -70,7 +74,14 @@ def create_tabs():
             if course.split("\n")[0] == course_json:
                 section_button = course_element.find_element(By.XPATH, './td[3]/div/div/div[1]/a')
                 section_button.click()
-                break  # break or else stale element
+                # now let us map this url number to the course name
+                # this will allow us to not repeatedly notify
+                while "options" in driver.current_url:
+                    sleep(0.01)
+                # page url id is the number at the end of the url
+                url_id = driver.current_url.split('/')[-1]
+                course_names[url_id] = course_json
+                break  # break here or else stale element in the for loop
 
 
 # howdyseek is literally indestructible
@@ -92,7 +103,26 @@ def has_no_sections():
     return False
 
 
+section_states = {}
+
+
 def check_sections(current_link):
+    current_course = None
+    current_url_id = current_link.split('/')[-1]
+    for url_id, course in course_names.items():
+        if url_id == current_url_id:
+            current_course = course
+            break
+
+    # shouldn't ever happen but just in case
+    if not current_course:
+        return
+
+    # Initialize section state for this source if it doesn't exist
+    # maps crns to current seats available
+    if current_course not in section_states:
+        section_states[current_course] = {}
+
     # firstly let us extract the crns of each course and the seats open for each course
     # recall that this is only on the enabled page
     # we can extract section information only if there are sections available to extract
@@ -161,7 +191,7 @@ def check_sections(current_link):
     # :-)
     for label in range(0, len(labels), 6):
         crn = labels[label].text
-        seats = labels[label + 3].text
+        seats = int(labels[label + 3].text)
         visible_sections[crn] = seats
 
     global data
@@ -178,11 +208,30 @@ def check_sections(current_link):
             # maybe optimize with driver.current_url and rfind('/') + 1
 
             if crn in visible_sections:
-                course = section["course"]
-                prof = section["prof"]
+                # check if this is a new section or if seats have changed
+                prev_seats = section_states[current_course].get(crn, None)
+                current_seats = visible_sections[crn]
 
-                notify(webhook, "SEATS AVAILABLE",
-                       f'{course} with {prof} is available.\nCRN: {crn}\nAggie Schedule Builder: https://tamu.collegescheduler.com/terms/Spring%202025%20-%20College%20Station/options')
+                # new section or seat change detected
+                if prev_seats is None or prev_seats != current_seats:
+                    course = section["course"]
+                    prof = section["prof"]
+
+                    status = "SEATS AVAILABLE" if prev_seats is None else f'SEAT CHANGE: {prev_seats} → {current_seats}'
+                    notify(webhook, status,
+                           f'{course} with {prof} is available.\nCRN: {crn}\nAggie Schedule Builder: https://tamu.collegescheduler.com/terms/Spring%202025%20-%20College%20Station/options')
+
+                    # Update state
+                    section_states[current_course][crn] = current_seats
+            # if a section was previously visible but now isn't, it means it now has 0 seats
+            elif crn in section_states[current_course]:
+                section_states[current_course][crn] = 0
+                prev_seats = section_states[current_course][crn]
+                if prev_seats > 0:  # only notify if previously seats available
+                    course = section["course"]
+                    prof = section["prof"]
+                    notify(webhook, "Section Full",
+                           f'{course} with {prof} is now full.\nCRN: {crn}')
 
 
 def notify(webhook, title, description):
