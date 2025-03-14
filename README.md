@@ -30,7 +30,7 @@ Proof: Assume, for the sake of contradiction, that HowdySeek is not the best cou
 
 Therefore, our assumption must be false, and HowdySeek is indeed the best course seat tracker. Q.E.D.
 
-## Current howdyseek W count: 11
+## Current howdyseek W count: 12
 1. STAT 212 with Patricia Ning (11am section > all)
 2. CSCE 221 with Beideman (Beideman the GOAT)
 3. ECEN 214 with Butler-Parry Karen (ECEN majors just can't compete with howdyseek)
@@ -41,7 +41,8 @@ Therefore, our assumption must be false, and HowdySeek is indeed the best course
 8. PBSI 107 with Hull (Psychology lovers just can't compete with howdyseek) (Web-based W)
 9. ENGL 210 with Anders (Average aggie university requirement just can't compete with howdyseek) (Web-based W)
 10. CSCE 120 with Merchant (Merchant also goated)
-11. Most notable win: POLS 207 with JESSE ALLEN CHUPP (GOAT OF ALL GOATS)
+11. CSCE 313 with Kebo (successful add/drop week snipe)
+12. Most notable win: POLS 207 with JESSE ALLEN CHUPP (GOAT OF ALL GOATS)
 
 # Setup
 - Install requirements from requirements.txt (`pip install -r requirements.txt`)
