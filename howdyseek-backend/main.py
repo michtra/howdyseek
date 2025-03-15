@@ -2,10 +2,10 @@
 HOWDY! SEEK
 """
 
-import json
 import random
 import time
 import traceback
+import re
 
 import requests
 from selenium import webdriver
@@ -21,50 +21,97 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 # Constants
+# FIXME modify to your correct profile with cookies stored
+USER_DATA_DIR_ARG = r'user-data-dir=/home/michael/.config/chromium/'
+PROFILE_DIR_ARG = '--profile-directory=Profile 7'
+
+# FIXME modify with every semester change
 TAMU_SCHEDULER_BASE_URL = "https://tamu.collegescheduler.com"
 FALL_2025_URL = f"{TAMU_SCHEDULER_BASE_URL}/terms/Fall%202025%20-%20College%20Station/options"
 TERM_STRING = '//*[@id="Fall 2025 - College Station"]'
+
 INVALID_PAGE_STRING = "invalid.aspx?aspxerrorpath=/"
-REFRESH_INTERVAL_RANGE = (30, 40)  # Seconds
+DEFAULT_REFRESH_INTERVAL_RANGE = (30, 40)  # Default seconds range if API fails
 KNOWN_EMPTY_SECTIONS = []  # CRNs of courses known to currently have no sections
-# this is to deploy an optimal waiting strategy
+# (this is to deploy an optimal waiting strategy)
+API_BASE_URL = "http://localhost:8000"  # Base URL for the API server
+
 
 class HowdySeek:
-    def __init__(self, config_file: str = 'config.json'):
-        """Constructor.
-
-        Args:
-            config_file: Path to the configuration JSON file
-        """
-        self.config_file = config_file
+    def __init__(self):
+        """Constructor."""
         self.data = self._load_config()
         self.course_names = {}  # Maps URL ID to course name
         self.section_states = {}  # Maps course names to {crn: seats} dictionaries
         self.tab_links = {}  # Maps window handles to URLs
-        
+        self.refresh_interval_range = self._load_refresh_settings()
+
         # Initialize WebDriver
         self.driver = self._setup_webdriver()
-    
+
     @staticmethod
     def _setup_webdriver() -> webdriver.Chrome:
         """Configure and return a webdriver."""
         chrome_options = Options()
         chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument(r'user-data-dir=/home/michael/.config/chromium/')
-        chrome_options.add_argument('--profile-directory=Profile 7') # or Profile 7 (those who know)
+        chrome_options.add_argument(USER_DATA_DIR_ARG)
+        chrome_options.add_argument(PROFILE_DIR_ARG)
         chrome_options.add_experimental_option('detach', True)
         return webdriver.Chrome(options=chrome_options)
-    
-    def _load_config(self) -> dict:
-        """Load configuration from the JSON file. 
-        Allows for config changes on the go; particularly, removing webhooks
-        or adding notifications to preexisting courses on the schedule builder."""
+
+    def _load_refresh_settings(self) -> tuple:
+        """Load refresh interval settings from the API."""
         try:
-            with open(self.config_file, 'r') as file:
-                return json.load(file)
-        except (FileNotFoundError, json.JSONDecodeError):
-            raise
-    
+            response = requests.get(f"{API_BASE_URL}/settings/")
+            if response.status_code != 200:
+                print(f"Failed to fetch settings: {response.text}")
+                return DEFAULT_REFRESH_INTERVAL_RANGE
+
+            settings = response.json()
+            return (settings['min_refresh_interval'], settings['max_refresh_interval'])
+        except Exception as e:
+            print(f"Error loading refresh settings from API: {e}")
+            traceback.print_exc()
+            return DEFAULT_REFRESH_INTERVAL_RANGE
+
+    def _load_config(self) -> dict:
+        """Load configuration from the API. 
+        Format the data to match the original JSON structure for compatibility."""
+        try:
+            # Get all users from the API
+            response = requests.get(f"{API_BASE_URL}/users/")
+            if response.status_code != 200:
+                print(f"Failed to fetch users: {response.text}")
+                return {}
+
+            users = response.json()
+
+            # Format data to match the original structure
+            config = {}
+            for user in users:
+                # Use webhook_url as the key
+                webhook = user['webhook_url']
+                courses = []
+
+                for course in user['courses']:
+                    courses.append({
+                        "prof": course['professor'],
+                        "course": course['course_name'],
+                        "crn": course['crn']
+                    })
+
+                if courses:  # Only add to config if there are courses
+                    config[webhook] = courses
+
+            # Also refresh the interval settings
+            self.refresh_interval_range = self._load_refresh_settings()
+
+            return config
+        except Exception as e:
+            print(f"Error loading config from API: {e}")
+            traceback.print_exc()
+            return {}
+
     def create_tabs(self):
         """Create browser tabs for each unique course in the configuration."""
         # Collect all unique courses from config
@@ -87,54 +134,57 @@ class HowdySeek:
                 # Submit selection
                 WebDriverWait(self.driver, 1).until(
                     EC.element_to_be_clickable((
-                        By.XPATH, 
+                        By.XPATH,
                         '//*[@id="scheduler-app"]/div/main/div/div/div/div[2]/div/div/button/span[2]'
                     ))
                 ).click()
-                
+
                 first_tab = False
             else:
                 # For subsequent tabs, open a new tab
                 self.driver.switch_to.new_window('tab')
                 self.driver.get(FALL_2025_URL)
-            
+
             # Wait for course list to load
             WebDriverWait(self.driver, 20).until(
                 EC.presence_of_element_located((
-                    By.XPATH, 
+                    By.XPATH,
                     '//*[@id="scheduler-app"]/div/main/div/div/div[1]/div/div[4]/div[1]/div[1]/div[1]/div/div[2]'
                 ))
             )
-            
+
             WebDriverWait(self.driver, 20).until(
                 EC.presence_of_element_located((
-                    By.XPATH, 
+                    By.XPATH,
                     '//*[@id="scheduler-app"]/div/main/div/div/div[2]/div[1]/div/div[2]/table'
                 ))
             )
-            
+
             course_elements = self.driver.find_elements(By.CLASS_NAME, 'css-131ktj-rowCss')
-            
+
             for course_element in course_elements:
                 # Extract the course name from the element
                 course = course_element.find_elements(By.XPATH, './*')[1].get_attribute('innerText')
-                
+                # Bug fix: use regex grab the correct course name. new format as of Fall 2025 registration
+                match = re.match(r"(\w+ \d+)", course)
+                course = match.group(1)
+
                 # Found a matching course with our json, let us designate this tab for that course
-                if course.split("\n")[0] == course_name:
+                if course == course_name:
                     # Click on the section button
                     section_button = course_element.find_element(By.XPATH, './td[3]/div/div/div[1]/a')
                     section_button.click()
-                    
+
                     # Wait for the page to change from options
                     while "options" in self.driver.current_url:
                         time.sleep(0.01)
-                    
+
                     # Extract the URL ID and map it to the course name
                     # This will allow us to not repeatedly notify
                     url_id = self.driver.current_url.split('/')[-1]
                     self.course_names[url_id] = course_name
                     break  # Break after finding the course to avoid stale elements
-    
+
     def redirect_if_invalid(self) -> bool:
         """Check if the current page has an error and redirect if needed.
         
@@ -146,7 +196,7 @@ class HowdySeek:
             self.driver.get(url)
             return True
         return False
-    
+
     def has_no_sections(self) -> bool:
         """Check if the current course has no sections available.
         
@@ -159,7 +209,7 @@ class HowdySeek:
             ).text
             return text == "Enabled (0 of 0)"
         return False
-    
+
     def check_sections(self, current_link: str):
         """Check for section availability changes and send notifications.
         
@@ -169,25 +219,25 @@ class HowdySeek:
         # Get the course name corresponding to this URL ID
         current_url_id = current_link.split('/')[-1]
         current_course = None
-        
+
         for url_id, course in self.course_names.items():
             if url_id == current_url_id:
                 current_course = course
                 break
-        
+
         # Skip if we can't identify the course (shouldn't ever happen)
         if not current_course:
             return
-        
+
         # Initialize section state for this course if it doesn't exist
         if current_course not in self.section_states:
             self.section_states[current_course] = {}
-        
+
         # Extract visible sections and their availability
         visible_sections = {}
-        
+
         success = False
-        
+
         # Different wait strategy based on whether we expect this course to have sections
         if current_link.split('/')[-1] in KNOWN_EMPTY_SECTIONS:
             # Wait #1 is for classes that currently have no sections available in the "Enabled" tab
@@ -210,7 +260,7 @@ class HowdySeek:
                     elif self.driver.find_elements(By.CLASS_NAME, 'spinner'):
                         # Or refresh if still loading / erroring out
                         self.driver.get(current_link)
-                    
+
                     # Check if there are no sections available
                     if self.has_no_sections():
                         # Break and don't toggle success to True
@@ -232,74 +282,74 @@ class HowdySeek:
                     if self.has_no_sections():
                         # Break and don't toggle success to True
                         break
-                    
+
                     # Otherwise refresh and retry. Could be a page error or just a timeout
                     self.driver.get(current_link)
-        
+
         # At this point, success is True. There are sections to check.
         # But if it's False, it's because there are no sections available from wait #1. Skip this class.
         if not success:
             return
-        
+
         # Extract section information
         try:
             labels = self.driver.find_elements(By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')
-            
+
             # Cool pattern: the CRN is every 6, and the seats open is every CRN index plus 3
             # :-)
             for label in range(0, len(labels), 6):
                 crn = labels[label].text
                 seats = int(labels[label + 3].text)
                 visible_sections[crn] = seats
-                
+
         except Exception:
             return
-        
+
         # Reload config to check for any updates
         self.data = self._load_config()
-        
+
         # Process all sections and send notifications for changes
         for webhook, classes in self.data.items():
             for section in classes:
                 crn = section["crn"]
-                
+
                 # Handle sections that are currently visible
                 if crn in visible_sections:
                     prev_seats = self.section_states[current_course].get(crn, None)
                     current_seats = visible_sections[crn]
-                    
+
                     # New section or seat change detected
                     if prev_seats is None or prev_seats != current_seats:
                         course = section["course"]
                         prof = section["prof"]
-                        
-                        status = "SEATS AVAILABLE" if prev_seats is None else f'SEAT CHANGE: {prev_seats} → {current_seats}'
+
+                        status = f'Seats Available ({current_seats})' if prev_seats is None else f'Seat Change: {prev_seats} → {current_seats}'
                         message = (
                             f'{course} with {prof} is available.\n'
                             f'CRN: {crn}\n'
                             f'Aggie Schedule Builder: {FALL_2025_URL}'
                         )
-                        
+
                         self._send_notification(webhook, status, message)
-                        
+
                         # Update state
                         self.section_states[current_course][crn] = current_seats
-                
+
                 # Handle sections that were previously visible but now aren't
                 elif crn in self.section_states[current_course]:
                     prev_seats = self.section_states[current_course][crn]
-                    
+
                     # Only notify if previously seats were available
                     if prev_seats > 0:
                         course = section["course"]
                         prof = section["prof"]
-                        
+
                         message = f'{course} with {prof} is now full.\nCRN: {crn}'
                         self._send_notification(webhook, "Section Full", message)
-                    
+
                     # Update state
                     self.section_states[current_course][crn] = 0
-    
+
     @staticmethod
     def _send_notification(webhook: str, title: str, description: str):
         """Send a Discord notification.
@@ -312,39 +362,39 @@ class HowdySeek:
         discord_json = {
             "embeds": [{"description": description, "title": title}]
         }
-        
+
         result = requests.post(webhook, json=discord_json)
         try:
             result.raise_for_status()
         except requests.exceptions.HTTPError as err:
             print(err)
-    
+
     def run(self):
         """Run the course monitoring loop"""
         self.create_tabs()
-        
+
         while True:
             for window_handle in self.driver.window_handles:
                 try:
                     self.driver.switch_to.window(window_handle)
-                    
+
                     # Skip invalid pages
                     if "offscreen_compiled.js" in self.driver.page_source:
                         continue
-                    
+
                     # Store the URL if not already stored
                     if window_handle not in self.tab_links:
                         self.tab_links[window_handle] = self.driver.current_url
-                    
+
                     current_link = self.tab_links[window_handle]
-                    
+
                     # Check for invalid page and redirect if needed
                     if not self.redirect_if_invalid():
                         self.driver.refresh()
-                    
+
                     # Check for section changes
                     self.check_sections(current_link)
-                    
+
                 except NoSuchWindowException:
                     pass
                 except WebDriverException:
@@ -352,9 +402,9 @@ class HowdySeek:
                 except Exception:
                     traceback.print_exc()
                     pass
-            
-            # Sleep for a random interval
-            time.sleep(random.uniform(*REFRESH_INTERVAL_RANGE))
+
+            # Sleep for a random interval using current settings
+            time.sleep(random.uniform(*self.refresh_interval_range))
 
 
 if __name__ == "__main__":
