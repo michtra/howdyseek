@@ -20,6 +20,7 @@ This contains the installation instructions for the backend and frontend.
   - `npm install`
   - `npm start`
   - Since the backend doesn't work with an existing instance of Chromium, I use the frontend on a different browser.
+    - Navigate to `localhost:3000` on the other browser after compiling the React application
  
 ## Running the course tracker
 - Make sure you don't have another instance of Chromium open
