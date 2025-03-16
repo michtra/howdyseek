@@ -4,7 +4,7 @@ Environment configuration file
 
 # Chrome profile configuration
 USER_DATA_DIR_ARG = r'user-data-dir=/home/michael/.config/chromium/'
-PROFILE_DIR_ARG = '--profile-directory=Profile 7'
+PROFILE_DIR_ARG = '--profile-directory=Default'
 
 # TAMU URLs
 TAMU_SCHEDULER_BASE_URL = "https://tamu.collegescheduler.com"

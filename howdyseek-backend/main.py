@@ -50,6 +50,8 @@ class HowdySeek:
         """Configure and return a webdriver."""
         chrome_options = Options()
         chrome_options.add_argument("--no-sandbox")
+        # bug fix
+        chrome_options.add_argument("--disable-extensions")
         chrome_options.add_argument(USER_DATA_DIR_ARG)
         chrome_options.add_argument(PROFILE_DIR_ARG)
         chrome_options.add_experimental_option('detach', True)
