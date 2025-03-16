@@ -20,21 +20,16 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-# Constants
-# FIXME modify to your correct profile with cookies stored
-USER_DATA_DIR_ARG = r'user-data-dir=/home/michael/.config/chromium/'
-PROFILE_DIR_ARG = '--profile-directory=Profile 7'
+# Import configuration from config.py
+from config import (
+    USER_DATA_DIR_ARG, PROFILE_DIR_ARG, TAMU_SCHEDULER_BASE_URL, 
+    FALL_2025_URL, TERM_STRING, API_BASE_URL, INVALID_PAGE_STRING, 
+    DEFAULT_REFRESH_INTERVAL_RANGE
+)
 
-# FIXME modify with every semester change
-TAMU_SCHEDULER_BASE_URL = "https://tamu.collegescheduler.com"
-FALL_2025_URL = f"{TAMU_SCHEDULER_BASE_URL}/terms/Fall%202025%20-%20College%20Station/options"
-TERM_STRING = '//*[@id="Fall 2025 - College Station"]'
-
-INVALID_PAGE_STRING = "invalid.aspx?aspxerrorpath=/"
-DEFAULT_REFRESH_INTERVAL_RANGE = (30, 40)  # Default seconds range if API fails
+# Global tracking variables
+FIRST_TAB_CREATED = False
 KNOWN_EMPTY_SECTIONS = []  # CRNs of courses known to currently have no sections
-# (this is to deploy an optimal waiting strategy)
-API_BASE_URL = "http://localhost:8000"  # Base URL for the API server
 
 
 class HowdySeek:
@@ -45,6 +40,7 @@ class HowdySeek:
         self.section_states = {}  # Maps course names to {crn: seats} dictionaries
         self.tab_links = {}  # Maps window handles to URLs
         self.refresh_interval_range = self._load_refresh_settings()
+        self.monitored_courses = set()  # Track which courses are currently being monitored
 
         # Initialize WebDriver
         self.driver = self._setup_webdriver()
@@ -112,55 +108,133 @@ class HowdySeek:
             traceback.print_exc()
             return {}
 
-    def create_tabs(self):
-        """Create browser tabs for each unique course in the configuration."""
-        # Collect all unique courses from config
+    def _get_all_courses(self) -> set:
+        """Extract all unique courses from the current configuration."""
         courses = set()
         for webhook, sections in self.data.items():
             for section in sections:
                 courses.add(section["course"])
+        return courses
 
-        first_tab = True
-        for course_name in courses:
-            if first_tab:
-                # For the first tab, navigate and select the term
-                self.driver.get(FALL_2025_URL)
+    def initialize_first_tab(self):
+        """Initialize the first tab with correct term selection.
+        This is called only when the first tab is created."""
+        global FIRST_TAB_CREATED
+        
+        # If first tab already initialized, do nothing
+        if FIRST_TAB_CREATED:
+            return
+        
+        # Navigate to the term selection page
+        self.driver.get(FALL_2025_URL)
 
-                # Select the correct term
-                WebDriverWait(self.driver, 20).until(
-                    EC.element_to_be_clickable((By.XPATH, TERM_STRING))
-                ).click()
+        # Select the correct term
+        WebDriverWait(self.driver, 20).until(
+            EC.element_to_be_clickable((By.XPATH, TERM_STRING))
+        ).click()
 
-                # Submit selection
-                WebDriverWait(self.driver, 1).until(
-                    EC.element_to_be_clickable((
-                        By.XPATH,
-                        '//*[@id="scheduler-app"]/div/main/div/div/div/div[2]/div/div/button/span[2]'
-                    ))
-                ).click()
+        # Submit selection
+        WebDriverWait(self.driver, 1).until(
+            EC.element_to_be_clickable((
+                By.XPATH,
+                '//*[@id="scheduler-app"]/div/main/div/div/div/div[2]/div/div/button/span[2]'
+            ))
+        ).click()
+        
+        # Mark first tab as created
+        FIRST_TAB_CREATED = True
+        
+        # Wait for course list to load
+        WebDriverWait(self.driver, 20).until(
+            EC.presence_of_element_located((
+                By.XPATH,
+                '//*[@id="scheduler-app"]/div/main/div/div/div[1]/div/div[4]/div[1]/div[1]/div[1]/div/div[2]'
+            ))
+        )
 
-                first_tab = False
+        WebDriverWait(self.driver, 20).until(
+            EC.presence_of_element_located((
+                By.XPATH,
+                '//*[@id="scheduler-app"]/div/main/div/div/div[2]/div[1]/div/div[2]/table'
+            ))
+        )
+
+    def create_tab_for_course(self, course_name: str) -> bool:
+        """Create a browser tab for a specific course.
+        
+        Args:
+            course_name: The name of the course to create a tab for
+            
+        Returns:
+            bool: True if tab was created successfully, False otherwise
+        """
+        global FIRST_TAB_CREATED
+        
+        # Skip if already monitoring this course
+        if course_name in self.monitored_courses:
+            return True
+            
+        try:
+            # Always check if first tab needs to be initialized
+            if not FIRST_TAB_CREATED:
+                self.initialize_first_tab()
+                
+                # Look for the course in the list
+                course_elements = self.driver.find_elements(By.CLASS_NAME, 'css-131ktj-rowCss')
+
+                for course_element in course_elements:
+                    # Extract the course name from the element
+                    course = course_element.find_elements(By.XPATH, './*')[1].get_attribute('innerText')
+                    # Bug fix: use regex grab the correct course name. new format as of Fall 2025 registration
+                    match = re.match(r"(\w+ \d+)", course)
+                    course = match.group(1)
+
+                    # Found a matching course with our json, let us designate this tab for that course
+                    if course == course_name:
+                        # Click on the section button
+                        section_button = course_element.find_element(By.XPATH, './td[3]/div/div/div[1]/a')
+                        section_button.click()
+
+                        # Wait for the page to change from options
+                        while "options" in self.driver.current_url:
+                            time.sleep(0.01)
+
+                        # Extract the URL ID and map it to the course name
+                        url_id = self.driver.current_url.split('/')[-1]
+                        self.course_names[url_id] = course_name
+                        
+                        # Store current URL in tab_links
+                        self.tab_links[self.driver.current_window_handle] = self.driver.current_url
+                        
+                        # Mark course as monitored
+                        self.monitored_courses.add(course_name)
+                        return True
+                
+                # If we get here and it's the first tab, but course wasn't found,
+                # still mark the first tab as created, since we'll need to create a new tab anyway
+                return False
             else:
                 # For subsequent tabs, open a new tab
                 self.driver.switch_to.new_window('tab')
                 self.driver.get(FALL_2025_URL)
+                
+                # Wait for course list to load
+                WebDriverWait(self.driver, 20).until(
+                    EC.presence_of_element_located((
+                        By.XPATH,
+                        '//*[@id="scheduler-app"]/div/main/div/div/div[1]/div/div[4]/div[1]/div[1]/div[1]/div/div[2]'
+                    ))
+                )
 
-            # Wait for course list to load
-            WebDriverWait(self.driver, 20).until(
-                EC.presence_of_element_located((
-                    By.XPATH,
-                    '//*[@id="scheduler-app"]/div/main/div/div/div[1]/div/div[4]/div[1]/div[1]/div[1]/div/div[2]'
-                ))
-            )
+                WebDriverWait(self.driver, 20).until(
+                    EC.presence_of_element_located((
+                        By.XPATH,
+                        '//*[@id="scheduler-app"]/div/main/div/div/div[2]/div[1]/div/div[2]/table'
+                    ))
+                )
 
-            WebDriverWait(self.driver, 20).until(
-                EC.presence_of_element_located((
-                    By.XPATH,
-                    '//*[@id="scheduler-app"]/div/main/div/div/div[2]/div[1]/div/div[2]/table'
-                ))
-            )
-
-            course_elements = self.driver.find_elements(By.CLASS_NAME, 'css-131ktj-rowCss')
+                # Look for the course in the list
+                course_elements = self.driver.find_elements(By.CLASS_NAME, 'css-131ktj-rowCss')
 
             for course_element in course_elements:
                 # Extract the course name from the element
@@ -180,10 +254,115 @@ class HowdySeek:
                         time.sleep(0.01)
 
                     # Extract the URL ID and map it to the course name
-                    # This will allow us to not repeatedly notify
                     url_id = self.driver.current_url.split('/')[-1]
                     self.course_names[url_id] = course_name
-                    break  # Break after finding the course to avoid stale elements
+                    
+                    # Store current URL in tab_links
+                    self.tab_links[self.driver.current_window_handle] = self.driver.current_url
+                    
+                    # Mark course as monitored
+                    self.monitored_courses.add(course_name)
+                    
+                    return True
+            
+            # If we get here, course wasn't found
+            print(f"Course {course_name} not found in scheduler")
+            return False
+            
+        except Exception as e:
+            print(f"Error creating tab for course {course_name}: {e}")
+            traceback.print_exc()
+            return False
+
+    def create_tabs(self):
+        """Create browser tabs for each unique course in the configuration."""
+        global FIRST_TAB_CREATED
+        
+        # Get all unique courses from config
+        courses = self._get_all_courses()
+        
+        # If no courses, nothing to do
+        if not courses:
+            return
+            
+        # Create first tab if not already created
+        if not FIRST_TAB_CREATED:
+            # Initialize first tab, regardless of whether we'll use it for a course
+            self.initialize_first_tab()
+            
+            # If we have courses, assign the first one to this tab
+            if courses:
+                first_course = next(iter(courses))
+                
+                # Look for the course in the list
+                course_elements = self.driver.find_elements(By.CLASS_NAME, 'css-131ktj-rowCss')
+
+                for course_element in course_elements:
+                    # Extract the course name from the element
+                    course = course_element.find_elements(By.XPATH, './*')[1].get_attribute('innerText')
+                    # Bug fix: use regex grab the correct course name. new format as of Fall 2025 registration
+                    match = re.match(r"(\w+ \d+)", course)
+                    course = match.group(1)
+
+                    # Found a matching course with our json, let us designate this tab for that course
+                    if course == first_course:
+                        # Click on the section button
+                        section_button = course_element.find_element(By.XPATH, './td[3]/div/div/div[1]/a')
+                        section_button.click()
+
+                        # Wait for the page to change from options
+                        while "options" in self.driver.current_url:
+                            time.sleep(0.01)
+
+                        # Extract the URL ID and map it to the course name
+                        url_id = self.driver.current_url.split('/')[-1]
+                        self.course_names[url_id] = first_course
+                        
+                        # Store current URL in tab_links
+                        self.tab_links[self.driver.current_window_handle] = self.driver.current_url
+                        
+                        # Mark course as monitored
+                        self.monitored_courses.add(first_course)
+                        
+                        # Remove first course so we don't create a new tab for it
+                        courses.remove(first_course)
+                        break
+        
+        # Create tabs for remaining courses using create_tab_for_course
+        # This ensures we handle the first tab initialization if needed
+        for course_name in courses:
+            if course_name not in self.monitored_courses:
+                self.create_tab_for_course(course_name)
+
+    def check_for_new_courses(self):
+        """Check for new courses added to the configuration and create tabs for them."""
+        global FIRST_TAB_CREATED
+        
+        # Reload config to get the latest courses
+        new_data = self._load_config()
+        
+        # Extract all courses from the updated config
+        new_courses = set()
+        for webhook, sections in new_data.items():
+            for section in sections:
+                new_courses.add(section["course"])
+        
+        # Find courses that aren't being monitored yet
+        courses_to_add = new_courses - self.monitored_courses
+        
+        # Update the stored data
+        self.data = new_data
+        
+        # If we have courses to add but first tab isn't created yet, use create_tabs()
+        if courses_to_add and not FIRST_TAB_CREATED:
+            self.create_tabs()
+            return len(courses_to_add) > 0
+            
+        # If first tab already exists, create tabs for new courses
+        for course_name in courses_to_add:
+            self.create_tab_for_course(course_name)
+            
+        return len(courses_to_add) > 0
 
     def redirect_if_invalid(self) -> bool:
         """Check if the current page has an error and redirect if needed.
@@ -305,13 +484,14 @@ class HowdySeek:
         except Exception:
             return
 
-        # Reload config to check for any updates
-        self.data = self._load_config()
-
         # Process all sections and send notifications for changes
         for webhook, classes in self.data.items():
             for section in classes:
                 crn = section["crn"]
+
+                # Skip if the course doesn't match the current one
+                if section["course"] != current_course:
+                    continue
 
                 # Handle sections that are currently visible
                 if crn in visible_sections:
@@ -371,9 +551,13 @@ class HowdySeek:
 
     def run(self):
         """Run the course monitoring loop"""
+        # Initial tab creation
         self.create_tabs()
-
+        
         while True:
+            # Check for new courses every cycle
+            self.check_for_new_courses()
+
             for window_handle in self.driver.window_handles:
                 try:
                     self.driver.switch_to.window(window_handle)
@@ -396,7 +580,9 @@ class HowdySeek:
                     self.check_sections(current_link)
 
                 except NoSuchWindowException:
-                    pass
+                    # Remove this handle from our tracking
+                    if window_handle in self.tab_links:
+                        del self.tab_links[window_handle]
                 except WebDriverException:
                     pass
                 except Exception:
