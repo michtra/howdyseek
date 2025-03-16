@@ -8,43 +8,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c257e76c-dd87-45a4-892d-dcd39814834f" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/codeStyles/codeStyleConfig.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dataSources/be2c0ff0-369b-49d4-b793-edc5667f3518.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dataSources/be2c0ff0-369b-49d4-b793-edc5667f3518/storage_v2/_src_/schema/main.uQUzAA.meta" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/INSTALLATION.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/LICENSE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-backend/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-backend/api.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-backend/models.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-backend/requirements.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/README.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/package-lock.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/package.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/postcss.config.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/public/favicon.ico" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/public/index.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/public/logo192.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/public/logo512.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/public/manifest.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/public/robots.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/src/App.css" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/src/App.jsx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/src/App.test.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/src/index.css" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/src/index.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/src/logo.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/src/reportWebVitals.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/src/setupTests.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/howdyseek-frontend/tailwind.config.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howdyseek-backend/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config-example.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/howdyseek-backend/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/howdyseek-backend/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/howdyseek-backend/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -118,6 +84,9 @@
       <workItem from="1741972084833" duration="11355000" />
       <workItem from="1742006040479" duration="10648000" />
       <workItem from="1742049315796" duration="3018000" />
+      <workItem from="1742053430635" duration="1622000" />
+      <workItem from="1742055223117" duration="195000" />
+      <workItem from="1742055825522" duration="249000" />
     </task>
     <servers />
   </component>

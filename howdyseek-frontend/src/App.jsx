@@ -295,7 +295,7 @@ const App = () => {
             <header className="bg-red-900 shadow">
                 <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
                     <div className="flex items-center">
-                        <h1 className="text-2xl font-bold text-white">howdyseek</h1>
+                        <h1 className="text-2xl font-bold text-white">HowdySeek</h1>
                         <span className="ml-4 text-sm text-white">Configuration Portal</span>
                     </div>
                     <div className="flex items-center space-x-4">
@@ -536,7 +536,7 @@ const App = () => {
                                     className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
                                     <Bell size={24} className="text-red-800"/>
                                 </div>
-                                <h3 className="mt-6 text-lg font-medium text-gray-900">Welcome to michaelseek 😎</h3>
+                                <h3 className="mt-6 text-lg font-medium text-gray-900">Welcome to HowdySeek 😎</h3>
                                 <p className="mt-2 text-sm text-gray-500">
                                     To get started, add a user with a Discord webhook to receive notifications when
                                     course availability changes.
