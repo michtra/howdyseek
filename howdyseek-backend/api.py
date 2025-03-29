@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from models import User, Course, Settings, init_db, get_session
 
@@ -40,6 +41,7 @@ class CourseBase(BaseModel):
     course_name: str
     professor: str
     crn: str
+    last_seat_count: Optional[int] = None
 
 
 class CourseCreate(CourseBase):
@@ -56,6 +58,7 @@ class CourseResponse(CourseBase):
 class UserBase(BaseModel):
     name: str
     webhook_url: str
+    stop_time: Optional[datetime] = None
 
 
 class UserCreate(UserBase):
@@ -65,6 +68,7 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     webhook_url: Optional[str] = None
+    stop_time: Optional[datetime] = None
 
 
 class UserResponse(UserBase):
@@ -101,7 +105,11 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Webhook URL already registered")
 
     # Create new user
-    db_user = User(name=user.name, webhook_url=user.webhook_url)
+    db_user = User(
+        name=user.name,
+        webhook_url=user.webhook_url,
+        stop_time=user.stop_time
+    )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -120,11 +128,16 @@ def update_user(user_id: int, user: UserUpdate, db: Session = Depends(get_db)):
         db_user.name = user.name
     if user.webhook_url is not None:
         db_user.webhook_url = user.webhook_url
+        
+    # Special handling for stop_time to allow setting it to None
+    # We need to check if the field was included in the request, not just if it's non-None
+    update_data = user.dict(exclude_unset=False)
+    if 'stop_time' in update_data:
+        db_user.stop_time = user.stop_time
 
     db.commit()
     db.refresh(db_user)
     return db_user
-
 
 @app.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(user_id: int, db: Session = Depends(get_db)):
@@ -168,10 +181,30 @@ def create_course(user_id: int, course: CourseCreate, db: Session = Depends(get_
         course_name=course.course_name,
         professor=course.professor,
         crn=course.crn,
+        last_seat_count=course.last_seat_count,
         user_id=user_id
     )
 
     db.add(db_course)
+    db.commit()
+    db.refresh(db_course)
+    return db_course
+
+
+@app.put("/courses/{course_id}", response_model=CourseResponse)
+def update_course(course_id: int, course: CourseBase, db: Session = Depends(get_db)):
+    """Update a course"""
+    db_course = db.query(Course).filter(Course.id == course_id).first()
+    if db_course is None:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Update course fields
+    db_course.course_name = course.course_name
+    db_course.professor = course.professor
+    db_course.crn = course.crn
+    if course.last_seat_count is not None:
+        db_course.last_seat_count = course.last_seat_count
+
     db.commit()
     db.refresh(db_course)
     return db_course

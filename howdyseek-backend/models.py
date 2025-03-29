@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, create_engine, Float
+from sqlalchemy import Column, Integer, String, ForeignKey, create_engine, Float, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
@@ -26,6 +26,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(100))
     webhook_url = Column(String(255), unique=True, nullable=False)
+    stop_time = Column(DateTime, nullable=True)  # New field for user stop time
 
     # Relationship to courses
     courses = relationship("Course", back_populates="user", cascade="all, delete-orphan")
@@ -35,6 +36,7 @@ class User(Base):
             "id": self.id,
             "name": self.name,
             "webhook_url": self.webhook_url,
+            "stop_time": self.stop_time.isoformat() if self.stop_time else None,
             "courses": [course.to_dict() for course in self.courses]
         }
 
@@ -46,6 +48,7 @@ class Course(Base):
     course_name = Column(String(100), nullable=False)
     professor = Column(String(100), nullable=False)
     crn = Column(String(20), nullable=False)
+    last_seat_count = Column(Integer, nullable=True)  # New field for tracking seat numbers
 
     # Foreign key to User
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
@@ -58,7 +61,8 @@ class Course(Base):
             "id": self.id,
             "course_name": self.course_name,
             "professor": self.professor,
-            "crn": self.crn
+            "crn": self.crn,
+            "last_seat_count": self.last_seat_count
         }
 
 

@@ -1,6 +1,10 @@
 """
 Environment configuration file
 """
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Chrome profile configuration
 USER_DATA_DIR_ARG = r'user-data-dir=/home/michael/.config/chromium/'
@@ -15,3 +19,6 @@ TERM_STRING = '//*[@id="Fall 2025 - College Station"]'
 API_BASE_URL = "http://localhost:8000"
 INVALID_PAGE_STRING = "invalid.aspx?aspxerrorpath=/"
 DEFAULT_REFRESH_INTERVAL_RANGE = (30, 40)  # Default seconds range if API fails
+
+# Status webhook URL for start/stop notifications
+STATUS_WEBHOOK_URL = os.getenv("STATUS_WEBHOOK_URL", "")

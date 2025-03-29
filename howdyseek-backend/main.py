@@ -3,9 +3,11 @@ HOWDY! SEEK
 """
 
 import random
+import re
+import sys
 import time
 import traceback
-import re
+from datetime import datetime, timezone
 
 import requests
 from selenium import webdriver
@@ -22,9 +24,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 # Import configuration from config.py
 from config import (
-    USER_DATA_DIR_ARG, PROFILE_DIR_ARG, TAMU_SCHEDULER_BASE_URL, 
-    FALL_2025_URL, TERM_STRING, API_BASE_URL, INVALID_PAGE_STRING, 
-    DEFAULT_REFRESH_INTERVAL_RANGE
+    USER_DATA_DIR_ARG, PROFILE_DIR_ARG, FALL_2025_URL, TERM_STRING, API_BASE_URL, INVALID_PAGE_STRING,
+    DEFAULT_REFRESH_INTERVAL_RANGE, STATUS_WEBHOOK_URL
 )
 
 # Global tracking variables
@@ -35,15 +36,19 @@ KNOWN_EMPTY_SECTIONS = []  # CRNs of courses known to currently have no sections
 class HowdySeek:
     def __init__(self):
         """Constructor."""
-        self.data = self._load_config()
         self.course_names = {}  # Maps URL ID to course name
         self.section_states = {}  # Maps course names to {crn: seats} dictionaries
         self.tab_links = {}  # Maps window handles to URLs
         self.refresh_interval_range = self._load_refresh_settings()
         self.monitored_courses = set()  # Track which courses are currently being monitored
+        self.user_stop_times = {}  # Maps webhook URLs to stop times
+
+        # Load config After initializing user_stop_times
+        self.data = self._load_config()
 
         # Initialize WebDriver
         self.driver = self._setup_webdriver()
+
 
     @staticmethod
     def _setup_webdriver() -> webdriver.Chrome:
@@ -57,7 +62,8 @@ class HowdySeek:
         chrome_options.add_experimental_option('detach', True)
         return webdriver.Chrome(options=chrome_options)
 
-    def _load_refresh_settings(self) -> tuple:
+    @staticmethod
+    def _load_refresh_settings() -> tuple:
         """Load refresh interval settings from the API."""
         try:
             response = requests.get(f"{API_BASE_URL}/settings/")
@@ -87,15 +93,25 @@ class HowdySeek:
             # Format data to match the original structure
             config = {}
             for user in users:
-                # Use webhook_url as the key
+                # Store stop time for each user keyed by webhook
                 webhook = user['webhook_url']
-                courses = []
+                if user['stop_time']:
+                    stop_time = datetime.fromisoformat(user['stop_time'])
+                    # Ensure it has timezone info
+                    if stop_time.tzinfo is None:
+                        stop_time = stop_time.replace(tzinfo=timezone.utc)
+                    self.user_stop_times[webhook] = stop_time
+                elif webhook in self.user_stop_times:
+                    # Remove any previously set stop time if it's now null
+                    del self.user_stop_times[webhook]
 
+                courses = []
                 for course in user['courses']:
                     courses.append({
                         "prof": course['professor'],
                         "course": course['course_name'],
-                        "crn": course['crn']
+                        "crn": course['crn'],
+                        "last_seat_count": course.get('last_seat_count')
                     })
 
                 if courses:  # Only add to config if there are courses
@@ -114,19 +130,80 @@ class HowdySeek:
         """Extract all unique courses from the current configuration."""
         courses = set()
         for webhook, sections in self.data.items():
+            # Skip users who have reached their stop time
+            if self._user_past_stop_time(webhook):
+                continue
+
             for section in sections:
                 courses.add(section["course"])
         return courses
+
+    def _user_past_stop_time(self, webhook: str) -> bool:
+        """Check if a user has reached their stop time."""
+        if webhook in self.user_stop_times:
+            stop_time = self.user_stop_times[webhook]
+            current_time = datetime.now(timezone.utc)
+            
+            # Make sure both datetimes are timezone-aware for comparison
+            if stop_time.tzinfo is None:
+                # If stop_time is naive, assume it's in UTC
+                stop_time = stop_time.replace(tzinfo=timezone.utc)
+                
+            return current_time > stop_time
+        return False
+
+    def _update_course_seat_count(self, webhook: str, crn: str, seats: int):
+        """Update the last known seat count for a course in the database."""
+        try:
+            # First, find the user by webhook URL
+            response = requests.get(f"{API_BASE_URL}/users/")
+            if response.status_code != 200:
+                print(f"Failed to fetch users: {response.text}")
+                return
+
+            users = response.json()
+            user_id = None
+            course_id = None
+
+            # Find the user and course IDs
+            course_data = None
+            for user in users:
+                if user['webhook_url'] == webhook:
+                    user_id = user['id']
+                    for course in user['courses']:
+                        if course['crn'] == crn:
+                            course_id = course['id']
+                            course_data = course  # Store the entire course data object
+                            break
+                    break
+
+            if user_id is not None and course_id is not None and course_data is not None:
+                # Update the course's last_seat_count
+                response = requests.put(
+                    f"{API_BASE_URL}/courses/{course_id}",
+                    json={
+                        "course_name": course_data['course_name'],
+                        "professor": course_data['professor'],
+                        "crn": crn,
+                        "last_seat_count": seats
+                    }
+                )
+
+                if response.status_code != 200:
+                    print(f"Failed to update course seat count: {response.text}")
+        except Exception as e:
+            print(f"Error updating course seat count: {e}")
+            traceback.print_exc()
 
     def initialize_first_tab(self):
         """Initialize the first tab with correct term selection.
         This is called only when the first tab is created."""
         global FIRST_TAB_CREATED
-        
+
         # If first tab already initialized, do nothing
         if FIRST_TAB_CREATED:
             return
-        
+
         # Navigate to the term selection page
         self.driver.get(FALL_2025_URL)
 
@@ -142,10 +219,10 @@ class HowdySeek:
                 '//*[@id="scheduler-app"]/div/main/div/div/div/div[2]/div/div/button/span[2]'
             ))
         ).click()
-        
+
         # Mark first tab as created
         FIRST_TAB_CREATED = True
-        
+
         # Wait for course list to load
         WebDriverWait(self.driver, 20).until(
             EC.presence_of_element_located((
@@ -171,16 +248,16 @@ class HowdySeek:
             bool: True if tab was created successfully, False otherwise
         """
         global FIRST_TAB_CREATED
-        
+
         # Skip if already monitoring this course
         if course_name in self.monitored_courses:
             return True
-            
+
         try:
             # Always check if first tab needs to be initialized
             if not FIRST_TAB_CREATED:
                 self.initialize_first_tab()
-                
+
                 # Look for the course in the list
                 course_elements = self.driver.find_elements(By.CLASS_NAME, 'css-131ktj-rowCss')
 
@@ -204,14 +281,14 @@ class HowdySeek:
                         # Extract the URL ID and map it to the course name
                         url_id = self.driver.current_url.split('/')[-1]
                         self.course_names[url_id] = course_name
-                        
+
                         # Store current URL in tab_links
                         self.tab_links[self.driver.current_window_handle] = self.driver.current_url
-                        
+
                         # Mark course as monitored
                         self.monitored_courses.add(course_name)
                         return True
-                
+
                 # If we get here and it's the first tab, but course wasn't found,
                 # still mark the first tab as created, since we'll need to create a new tab anyway
                 return False
@@ -219,7 +296,7 @@ class HowdySeek:
                 # For subsequent tabs, open a new tab
                 self.driver.switch_to.new_window('tab')
                 self.driver.get(FALL_2025_URL)
-                
+
                 # Wait for course list to load
                 WebDriverWait(self.driver, 20).until(
                     EC.presence_of_element_located((
@@ -258,19 +335,19 @@ class HowdySeek:
                     # Extract the URL ID and map it to the course name
                     url_id = self.driver.current_url.split('/')[-1]
                     self.course_names[url_id] = course_name
-                    
+
                     # Store current URL in tab_links
                     self.tab_links[self.driver.current_window_handle] = self.driver.current_url
-                    
+
                     # Mark course as monitored
                     self.monitored_courses.add(course_name)
-                    
+
                     return True
-            
+
             # If we get here, course wasn't found
             print(f"Course {course_name} not found in scheduler")
             return False
-            
+
         except Exception as e:
             print(f"Error creating tab for course {course_name}: {e}")
             traceback.print_exc()
@@ -279,23 +356,23 @@ class HowdySeek:
     def create_tabs(self):
         """Create browser tabs for each unique course in the configuration."""
         global FIRST_TAB_CREATED
-        
+
         # Get all unique courses from config
         courses = self._get_all_courses()
-        
+
         # If no courses, nothing to do
         if not courses:
             return
-            
+
         # Create first tab if not already created
         if not FIRST_TAB_CREATED:
             # Initialize first tab, regardless of whether we'll use it for a course
             self.initialize_first_tab()
-            
+
             # If we have courses, assign the first one to this tab
             if courses:
                 first_course = next(iter(courses))
-                
+
                 # Look for the course in the list
                 course_elements = self.driver.find_elements(By.CLASS_NAME, 'css-131ktj-rowCss')
 
@@ -319,17 +396,17 @@ class HowdySeek:
                         # Extract the URL ID and map it to the course name
                         url_id = self.driver.current_url.split('/')[-1]
                         self.course_names[url_id] = first_course
-                        
+
                         # Store current URL in tab_links
                         self.tab_links[self.driver.current_window_handle] = self.driver.current_url
-                        
+
                         # Mark course as monitored
                         self.monitored_courses.add(first_course)
-                        
+
                         # Remove first course so we don't create a new tab for it
                         courses.remove(first_course)
                         break
-        
+
         # Create tabs for remaining courses using create_tab_for_course
         # This ensures we handle the first tab initialization if needed
         for course_name in courses:
@@ -339,31 +416,35 @@ class HowdySeek:
     def check_for_new_courses(self):
         """Check for new courses added to the configuration and create tabs for them."""
         global FIRST_TAB_CREATED
-        
+
         # Reload config to get the latest courses
         new_data = self._load_config()
-        
-        # Extract all courses from the updated config
+
+        # Extract all courses from the updated config, respecting stop times
         new_courses = set()
         for webhook, sections in new_data.items():
+            # Skip users who have reached their stop time
+            if self._user_past_stop_time(webhook):
+                continue
+
             for section in sections:
                 new_courses.add(section["course"])
-        
+
         # Find courses that aren't being monitored yet
         courses_to_add = new_courses - self.monitored_courses
-        
+
         # Update the stored data
         self.data = new_data
-        
+
         # If we have courses to add but first tab isn't created yet, use create_tabs()
         if courses_to_add and not FIRST_TAB_CREATED:
             self.create_tabs()
             return len(courses_to_add) > 0
-            
+
         # If first tab already exists, create tabs for new courses
         for course_name in courses_to_add:
             self.create_tab_for_course(course_name)
-            
+
         return len(courses_to_add) > 0
 
     def redirect_if_invalid(self) -> bool:
@@ -488,6 +569,10 @@ class HowdySeek:
 
         # Process all sections and send notifications for changes
         for webhook, classes in self.data.items():
+            # Skip if the user has reached their stop time
+            if self._user_past_stop_time(webhook):
+                continue
+
             for section in classes:
                 crn = section["crn"]
 
@@ -499,23 +584,46 @@ class HowdySeek:
                 if crn in visible_sections:
                     prev_seats = self.section_states[current_course].get(crn, None)
                     current_seats = visible_sections[crn]
+                    last_seat_count = section.get("last_seat_count")
 
-                    # New section or seat change detected
-                    if prev_seats is None or prev_seats != current_seats:
-                        course = section["course"]
-                        prof = section["prof"]
+                    # Condition: prev_seats is None if it's the first time check after startup
+                    # This is because the course is being checked for the first time,
+                    # and it isn't included in section_states yet.
+                    if prev_seats is None:
+                        # Only send a notification if we have no record in DB or DB value differs from current
+                        if last_seat_count is None or last_seat_count != current_seats:
+                            course = section["course"]
+                            prof = section["prof"]
 
-                        status = f'Seats Available ({current_seats})' if prev_seats is None else f'Seat Change: {prev_seats} → {current_seats}'
-                        message = (
-                            f'{course} with {prof} is available.\n'
-                            f'CRN: {crn}\n'
-                            f'Aggie Schedule Builder: {FALL_2025_URL}'
-                        )
+                            status = f'Seats Available ({current_seats})'
 
-                        self._send_notification(webhook, status, message)
+                            message = (
+                                f'{course} with {prof} is available.\n'
+                                f'CRN: {crn}\n'
+                                f'Aggie Schedule Builder: {FALL_2025_URL}'
+                            )
 
-                        # Update state
-                        self.section_states[current_course][crn] = current_seats
+                            self._send_notification(webhook, status, message)
+                    else:
+                        # We've seen this section before in this session
+                        # Normal operation: send notification when seat count changes.
+                        if prev_seats != current_seats:
+                            course = section["course"]
+                            prof = section["prof"]
+
+                            status = f'Seat Change: {prev_seats} → {current_seats}'
+
+                            message = (
+                                f'{course} with {prof} is available.\n'
+                                f'CRN: {crn}\n'
+                                f'Aggie Schedule Builder: {FALL_2025_URL}'
+                            )
+
+                            self._send_notification(webhook, status, message)
+
+                    # Update state in memory and in database regardless of notification
+                    self.section_states[current_course][crn] = current_seats
+                    self._update_course_seat_count(webhook, crn, current_seats)
 
                 # Handle sections that were previously visible but now aren't
                 elif crn in self.section_states[current_course]:
@@ -529,11 +637,12 @@ class HowdySeek:
                         message = f'{course} with {prof} is now full.\nCRN: {crn}'
                         self._send_notification(webhook, "Section Full", message)
 
-                    # Update state
+                    # Update state in memory and in database
                     self.section_states[current_course][crn] = 0
+                    self._update_course_seat_count(webhook, crn, 0)
 
-    @staticmethod
-    def _send_notification(webhook: str, title: str, description: str):
+
+    def _send_notification(self, webhook: str, title: str, description: str):
         """Send a Discord notification.
         
         Args:

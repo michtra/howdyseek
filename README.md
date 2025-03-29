@@ -1,6 +1,8 @@
 # howdyseek
 the #1 solution to getting the classes you need. created just in time for spring 2025 open registration.
 
+bulletproof and ready with a frontend for fall 2025 preregistration + open registration.
+
 howdyseek (aka michaelseek) > all
 
 # Description

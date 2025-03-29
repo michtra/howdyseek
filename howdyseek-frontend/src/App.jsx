@@ -1,5 +1,5 @@
 import React, {useState, useEffect, useCallback, useRef} from 'react';
-import {Bell, Settings, Trash2, Plus} from 'lucide-react';
+import {Bell, Settings, Trash2, Plus, Clock} from 'lucide-react';
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -18,6 +18,7 @@ const App = () => {
     const userFormRef = useRef(null);
     const courseFormRef = useRef(null);
     const settingsFormRef = useRef(null);
+    const userSettingsFormRef = useRef(null);
 
     // Modal states
     const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -88,15 +89,37 @@ const App = () => {
         setSelectedUser(user);
     };
 
+    // Helper function to format datetime for display
+    const formatDateTime = (isoString) => {
+        if (!isoString) return 'Not set';
+        const date = new Date(isoString);
+        return date.toLocaleString();
+    };
+
+    // Helper function to convert local datetime to ISO
+    const localDateTimeToISO = (dateTimeString) => {
+        if (!dateTimeString) return null;
+        // Parse the local datetime input
+        const localDate = new Date(dateTimeString);
+        // Create an ISO string that preserves the local time
+        // by adjusting for the timezone offset
+        const isoDate = new Date(
+            localDate.getTime() - (localDate.getTimezoneOffset() * 60000)
+        ).toISOString();
+        
+        return isoDate;
+    };
+
     const handleAddUser = async (e) => {
         e.preventDefault();
 
         // Get values directly from form elements
         const name = userFormRef.current.elements.name.value;
         const webhookUrl = userFormRef.current.elements.webhook_url.value;
+        const stopTime = userFormRef.current.elements.stop_time.value;
 
         if (!name || !webhookUrl) {
-            alert('Please fill in all fields');
+            alert('Please fill in all required fields');
             return;
         }
 
@@ -106,7 +129,11 @@ const App = () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({name, webhook_url: webhookUrl}),
+                body: JSON.stringify({
+                    name, 
+                    webhook_url: webhookUrl,
+                    stop_time: stopTime ? localDateTimeToISO(stopTime) : null
+                }),
             });
 
             if (!response.ok) throw new Error('Failed to add user');
@@ -122,6 +149,43 @@ const App = () => {
         catch (error) {
             console.error('Error adding user:', error);
             alert('Failed to add user: ' + error.message);
+        }
+    };
+
+    const handleUpdateUserSettings = async (e) => {
+        e.preventDefault();
+        
+        if (!selectedUser) return;
+        
+        const stopTime = userSettingsFormRef.current.elements.stop_time.value;
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/users/${selectedUser.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    stop_time: stopTime ? localDateTimeToISO(stopTime) : null
+                }),
+            });
+
+            if (!response.ok) throw new Error('Failed to update user');
+
+            const updatedUser = await response.json();
+            
+            setUsers(prevUsers => 
+                prevUsers.map(user => 
+                    user.id === updatedUser.id ? updatedUser : user
+                )
+            );
+            setSelectedUser(updatedUser);
+            
+            alert('User settings updated successfully!');
+        }
+        catch (error) {
+            console.error('Error updating user:', error);
+            alert('Failed to update user: ' + error.message);
         }
     };
 
@@ -276,6 +340,22 @@ const App = () => {
         );
     };
 
+    // Correctly present the datetime in the input field
+    const formatDateTimeForInput = (isoString) => {
+        if (!isoString) return '';
+        
+        // Create a date object that properly considers the timezone in the ISO string
+        const date = new Date(isoString);
+        
+        // Format for datetime-local input (YYYY-MM-DDTHH:MM)
+        // Adjust for timezone to display the correct local time
+        const localDateTime = new Date(
+            date.getTime() - (date.getTimezoneOffset() * 60000)
+        ).toISOString().slice(0, 16);
+        
+        return localDateTime;
+    };
+
     // Render loading state
     if (isLoading && users.length === 0) {
         return (
@@ -342,6 +422,12 @@ const App = () => {
                                         >
                                             <div className="truncate">
                                                 <p className="font-medium">{user.name}</p>
+                                                {user.stop_time && (
+                                                    <p className="text-xs text-gray-500 flex items-center mt-1">
+                                                        <Clock size={12} className="mr-1"/>
+                                                        Stops: {formatDateTime(user.stop_time)}
+                                                    </p>
+                                                )}
                                             </div>
                                             <button
                                                 className="text-gray-400 hover:text-red-600 ml-2"
@@ -369,6 +455,12 @@ const App = () => {
                                             <h2 className="text-lg font-medium text-gray-900">
                                                 {selectedUser.name}
                                             </h2>
+                                            {selectedUser.stop_time && (
+                                                <p className="text-sm text-gray-500 flex items-center mt-1">
+                                                    <Clock size={14} className="mr-1"/>
+                                                    Monitoring stops at {formatDateTime(selectedUser.stop_time)}
+                                                </p>
+                                            )}
                                         </div>
                                         <div>
                                             <button
@@ -455,6 +547,10 @@ const App = () => {
                                                                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                                     Professor
                                                                 </th>
+                                                                <th scope="col"
+                                                                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                                    Seats
+                                                                </th>
                                                                 <th scope="col" className="relative px-6 py-3">
                                                                     <span className="sr-only">Actions</span>
                                                                 </th>
@@ -475,6 +571,19 @@ const App = () => {
                                                                         <div
                                                                             className="text-gray-900">{course.professor}</div>
                                                                     </td>
+                                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                                        {course.last_seat_count !== null ? (
+                                                                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                                                                course.last_seat_count > 0 
+                                                                                    ? 'bg-green-100 text-green-800' 
+                                                                                    : 'bg-red-100 text-red-800'
+                                                                            }`}>
+                                                                                {course.last_seat_count}
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="text-gray-500 text-sm">Unknown</span>
+                                                                        )}
+                                                                    </td>
                                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                                         <button
                                                                             className="text-red-600 hover:text-red-900 flex items-center justify-end"
@@ -494,7 +603,7 @@ const App = () => {
                                         ) : (
                                             <div className="max-w-md mx-auto">
                                                 <h3 className="text-lg font-medium mb-4">User Settings</h3>
-                                                <form className="space-y-4">
+                                                <form ref={userSettingsFormRef} onSubmit={handleUpdateUserSettings} className="space-y-4">
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700">User
                                                             Name</label>
@@ -515,10 +624,28 @@ const App = () => {
                                                             readOnly
                                                         />
                                                     </div>
-                                                    <div className="pt-2">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700">Stop Time</label>
+                                                        <input
+                                                            type="datetime-local"
+                                                            name="stop_time"
+                                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
+                                                            defaultValue={formatDateTimeForInput(selectedUser.stop_time)}
+                                                        />
+                                                        <p className="mt-1 text-xs text-gray-500">
+                                                            When should monitoring stop for this user? Leave empty for indefinite monitoring.
+                                                        </p>
+                                                    </div>
+                                                    <div className="pt-2 flex space-x-4">
+                                                        <button
+                                                            type="submit"
+                                                            className="rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                        >
+                                                            Update Settings
+                                                        </button>
                                                         <button
                                                             type="button"
-                                                            className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                            className="rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                                                             onClick={() => handleDeleteUser(selectedUser.id)}
                                                         >
                                                             Delete User
@@ -581,6 +708,17 @@ const App = () => {
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
                             placeholder="https://discord.com/api/webhooks/..."
                         />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Stop Time (Optional)</label>
+                        <input
+                            type="datetime-local"
+                            name="stop_time"
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                            When should monitoring stop for this user? Leave empty for indefinite monitoring.
+                        </p>
                     </div>
                     <div className="pt-2">
                         <button
