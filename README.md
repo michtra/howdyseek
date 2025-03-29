@@ -21,19 +21,21 @@ a term selection again. Therefore, the term has to be selected on the initial pa
 # Database Schema
 ## Settings
 - id (PK): Integer
-- min_refresh_interval: Float (Default: 30.0)
-- max_refresh_interval: Float (Default: 40.0)
+- min_refresh_interval: Float (Default: 20.0)
+- max_refresh_interval: Float (Default: 30.0)
 
 ## Users
 - id (PK): Integer
 - name: String
 - webhook_url: String (Discord webhook URL for notifications)
+- stop_time: DateTime (Nullable, time when user tracking should stop)
 
 ## Courses
 - id (PK): Integer
 - course_name: String
 - professor: String
 - crn: String
+- last_seat_count: Integer (Nullable, for tracking seat changes)
 - user_id (FK): Integer (References users.id)
 
 # NFAQ (non-frequently asked questions)

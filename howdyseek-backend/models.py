@@ -9,8 +9,8 @@ class Settings(Base):
     __tablename__ = 'settings'
 
     id = Column(Integer, primary_key=True)
-    min_refresh_interval = Column(Float, default=30.0)
-    max_refresh_interval = Column(Float, default=40.0)
+    min_refresh_interval = Column(Float, default=20.0)
+    max_refresh_interval = Column(Float, default=30.0)
 
     def to_dict(self):
         return {
@@ -76,7 +76,7 @@ def init_db(db_url="sqlite:///howdyseek.db"):
     session = Session()
 
     if not session.query(Settings).first():
-        default_settings = Settings(min_refresh_interval=30.0, max_refresh_interval=40.0)
+        default_settings = Settings(min_refresh_interval=20.0, max_refresh_interval=30.0)
         session.add(default_settings)
         session.commit()
 
