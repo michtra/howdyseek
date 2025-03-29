@@ -8,6 +8,11 @@ This contains the installation instructions for the backend and frontend.
 - Start the API server
   - `uvicorn api:app --reload --host 0.0.0.0 --port 8000`
 
+### Discord Bot Status
+- Create a Discord bot (https://discord.com/developers/docs/intro)
+- Get its token, place it in `.env.example`, rename to `.env`
+- This Discord bot will be used to show the running status of howdyseek
+
 ## Browser setup (Chrome/Chromium)
 - Have a user profile with cookies enabled
 - Log in to your university account

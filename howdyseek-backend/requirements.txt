@@ -4,3 +4,4 @@ fastapi
 sqlalchemy
 uvicorn
 python-dotenv
+discord.py

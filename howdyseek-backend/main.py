@@ -4,10 +4,13 @@ HOWDY! SEEK
 
 import random
 import re
-import sys
 import time
 import traceback
 from datetime import datetime, timezone
+import threading
+import asyncio
+import signal
+import sys
 
 import requests
 from selenium import webdriver
@@ -25,8 +28,28 @@ from selenium.webdriver.support.ui import WebDriverWait
 # Import configuration from config.py
 from config import (
     USER_DATA_DIR_ARG, PROFILE_DIR_ARG, FALL_2025_URL, TERM_STRING, API_BASE_URL, INVALID_PAGE_STRING,
-    DEFAULT_REFRESH_INTERVAL_RANGE, STATUS_WEBHOOK_URL
+    DEFAULT_REFRESH_INTERVAL_RANGE
 )
+
+import discord
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Create a shared termination event
+termination_event = threading.Event()
+
+force_exit = False
+# Signal handler for clean shutdown
+def signal_handler(sig, frame):
+    print("Shutting down gracefully...")
+    termination_event.set()
+    global force_exit
+    if force_exit:
+        print("Forcing exit")
+        sys.exit(1)
+    force_exit = True
 
 # Global tracking variables
 FIRST_TAB_CREATED = False
@@ -48,7 +71,6 @@ class HowdySeek:
 
         # Initialize WebDriver
         self.driver = self._setup_webdriver()
-
 
     @staticmethod
     def _setup_webdriver() -> webdriver.Chrome:
@@ -143,12 +165,12 @@ class HowdySeek:
         if webhook in self.user_stop_times:
             stop_time = self.user_stop_times[webhook]
             current_time = datetime.now(timezone.utc)
-            
+
             # Make sure both datetimes are timezone-aware for comparison
             if stop_time.tzinfo is None:
                 # If stop_time is naive, assume it's in UTC
                 stop_time = stop_time.replace(tzinfo=timezone.utc)
-                
+
             return current_time > stop_time
         return False
 
@@ -641,7 +663,6 @@ class HowdySeek:
                     self.section_states[current_course][crn] = 0
                     self._update_course_seat_count(webhook, crn, 0)
 
-
     def _send_notification(self, webhook: str, title: str, description: str):
         """Send a Discord notification.
         
@@ -664,12 +685,16 @@ class HowdySeek:
         """Run the course monitoring loop"""
         # Initial tab creation
         self.create_tabs()
-        
-        while True:
+
+        # Changed from while True to check termination event
+        while not termination_event.is_set():
             # Check for new courses every cycle
             self.check_for_new_courses()
 
-            for window_handle in self.driver.window_handles:
+            for window_handle in list(self.driver.window_handles):
+                if termination_event.is_set():
+                    break
+                    
                 try:
                     self.driver.switch_to.window(window_handle)
 
@@ -704,9 +729,56 @@ class HowdySeek:
             time.sleep(random.uniform(*self.refresh_interval_range))
 
 
-if __name__ == "__main__":
+# Run the monitor in a thread
+def run_monitor():
     try:
         monitor = HowdySeek()
         monitor.run()
     except Exception as e:
+        print(f"Monitor error: {e}")
         traceback.print_exc()
+        termination_event.set()
+
+# Run Discord bot in a thread
+def run_discord_bot():
+    try:
+        intents = discord.Intents.default()
+        client = discord.Client(intents=intents)
+        
+        @client.event
+        async def on_ready():
+            client.loop.create_task(check_termination())
+            
+        async def check_termination():
+            while not termination_event.is_set():
+                await asyncio.sleep(1)
+            await client.close()
+            
+        client.run(os.getenv("DISCORD_TOKEN"))
+    except Exception as e:
+        print(f"Discord bot error: {e}")
+        traceback.print_exc()
+        termination_event.set()
+
+if __name__ == "__main__":
+    try:
+        # Set up signal handling
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        
+        # Create and start threads
+        monitor_thread = threading.Thread(target=run_monitor)
+        discord_thread = threading.Thread(target=run_discord_bot)
+        
+        monitor_thread.start()
+        discord_thread.start()
+        
+        # Wait for threads to terminate
+        monitor_thread.join()
+        discord_thread.join()
+        
+        print("Program terminated")
+    except Exception as e:
+        print(f"Main program error: {e}")
+        traceback.print_exc()
+        sys.exit(1)
