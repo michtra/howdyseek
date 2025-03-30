@@ -10,11 +10,7 @@
   <component name="ChangeListManager">
     <list default="true" id="c257e76c-dd87-45a4-892d-dcd39814834f" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/INSTALLATION.md" beforeDir="false" afterPath="$PROJECT_DIR$/INSTALLATION.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/howdyseek-backend/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/howdyseek-backend/.env.example" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/howdyseek-backend/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/howdyseek-backend/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/howdyseek-backend/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/howdyseek-backend/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/howdyseek-backend/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/howdyseek-backend/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -106,6 +102,8 @@
       <workItem from="1743261424901" duration="29000" />
       <workItem from="1743261852362" duration="163000" />
       <workItem from="1743265173803" duration="163000" />
+      <workItem from="1743297847772" duration="43000" />
+      <workItem from="1743299734398" duration="23000" />
     </task>
     <servers />
   </component>

@@ -41,6 +41,8 @@ load_dotenv()
 termination_event = threading.Event()
 
 force_exit = False
+
+
 # Signal handler for clean shutdown
 def signal_handler(sig, frame):
     print("Shutting down gracefully...")
@@ -50,6 +52,7 @@ def signal_handler(sig, frame):
         print("Forcing exit")
         sys.exit(1)
     force_exit = True
+
 
 # Global tracking variables
 FIRST_TAB_CREATED = False
@@ -694,7 +697,7 @@ class HowdySeek:
             for window_handle in list(self.driver.window_handles):
                 if termination_event.is_set():
                     break
-                    
+
                 try:
                     self.driver.switch_to.window(window_handle)
 
@@ -739,44 +742,78 @@ def run_monitor():
         traceback.print_exc()
         termination_event.set()
 
+
 # Run Discord bot in a thread
 def run_discord_bot():
     try:
         intents = discord.Intents.default()
         client = discord.Client(intents=intents)
-        
+
         @client.event
         async def on_ready():
             client.loop.create_task(check_termination())
-            
+            client.loop.create_task(update_status())
+
         async def check_termination():
             while not termination_event.is_set():
                 await asyncio.sleep(1)
             await client.close()
-            
+
+        # Updates the Discord Presence
+        async def update_status():
+            while not termination_event.is_set():
+                try:
+                    response = requests.get(f"{API_BASE_URL}/users/")
+                    if response.status_code == 200:
+                        users = response.json()
+
+                        # Count active users and total courses
+                        active_users = len(users)
+                        total_courses = 0
+
+                        for user in users:
+                            total_courses += len(user['courses'])
+
+                        courses_text = "course" if total_courses == 1 else "courses"
+                        users_text = "user" if active_users == 1 else "users"
+
+                        # Set the custom activity
+                        activity = discord.Activity(
+                            name=f"{total_courses} {courses_text} for {active_users} {users_text} :P",
+                            type=discord.ActivityType.watching
+                        )
+                        await client.change_presence(activity=activity)
+
+                except Exception:
+                    traceback.print_exc()
+
+                # Update every 5 minutes
+                await asyncio.sleep(300)
+
         client.run(os.getenv("DISCORD_TOKEN"))
     except Exception as e:
         print(f"Discord bot error: {e}")
         traceback.print_exc()
         termination_event.set()
 
+
 if __name__ == "__main__":
     try:
         # Set up signal handling
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
-        
+
         # Create and start threads
         monitor_thread = threading.Thread(target=run_monitor)
         discord_thread = threading.Thread(target=run_discord_bot)
-        
+
         monitor_thread.start()
         discord_thread.start()
-        
+
         # Wait for threads to terminate
         monitor_thread.join()
         discord_thread.join()
-        
+
         print("Program terminated")
     except Exception as e:
         print(f"Main program error: {e}")
