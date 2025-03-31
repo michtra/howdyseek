@@ -56,7 +56,6 @@ def signal_handler(sig, frame):
 
 # Global tracking variables
 FIRST_TAB_CREATED = False
-KNOWN_EMPTY_SECTIONS = []  # CRNs of courses known to currently have no sections
 
 
 class HowdySeek:
@@ -314,7 +313,7 @@ class HowdySeek:
                         self.monitored_courses.add(course_name)
                         return True
 
-                # If we get here and it's the first tab, but course wasn't found,
+                # If we get here, and it's the first tab, but course wasn't found,
                 # still mark the first tab as created, since we'll need to create a new tab anyway
                 return False
             else:
@@ -525,53 +524,23 @@ class HowdySeek:
 
         success = False
 
-        # Different wait strategy based on whether we expect this course to have sections
-        if current_link.split('/')[-1] in KNOWN_EMPTY_SECTIONS:
-            # Wait #1 is for classes that currently have no sections available in the "Enabled" tab
-            # We can assume that they probably still don't have sections so we wait a shorter amount of time for them
-            while not success:
-                try:
-                    # Wait only 2 seconds to see if section information appears
-                    WebDriverWait(self.driver, 2).until(
-                        EC.presence_of_element_located((By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss'))
-                    )
-                    success = True
-                except TimeoutException:
-                    # At this point, there is no section information.
-                    # The page may be errored out or there are simply no sections
+        # If a section element doesn't show up, it's an errored page, just refresh
+        while not success:
+            try:
+                # Wait for the first section to show up on screen
+                # We can assume all the other sections show up as well at the same time
+                WebDriverWait(self.driver, 5).until(
+                    EC.presence_of_element_located((By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss'))
+                )
+                success = True
+            except TimeoutException:
+                # In the case that there are no sections, could be errored or could have no sections
+                if self.has_no_sections():
+                    # Break and don't toggle success to True if errored
+                    break
 
-                    # Do error handling before checking if sections are available
-                    if "invalid request" in self.driver.page_source:
-                        # Refresh if invalid request
-                        self.driver.get(current_link)
-                    elif self.driver.find_elements(By.CLASS_NAME, 'spinner'):
-                        # Or refresh if still loading / erroring out
-                        self.driver.get(current_link)
-
-                    # Check if there are no sections available
-                    if self.has_no_sections():
-                        # Break and don't toggle success to True
-                        break
-        else:
-            # Wait #2 is for normal classes with at least one section available
-            # Unlike the previous one, we should wait longer for a section element to show up
-            # If a section element doesn't show up, it's an errored page, just refresh
-            while not success:
-                try:
-                    # Wait for the first section to show up on screen
-                    # We can assume all the other sections show up as well at the same time
-                    WebDriverWait(self.driver, 5).until(
-                        EC.presence_of_element_located((By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss'))
-                    )
-                    success = True
-                except TimeoutException:
-                    # In the case that there are no sections
-                    if self.has_no_sections():
-                        # Break and don't toggle success to True
-                        break
-
-                    # Otherwise refresh and retry. Could be a page error or just a timeout
-                    self.driver.get(current_link)
+                # Otherwise refresh and retry. Could be a page error or just a timeout
+                self.driver.get(current_link)
 
         # At this point, success is True. There are sections to check.
         # But if it's False, it's because there are no sections available from wait #1. Skip this class.
@@ -616,7 +585,7 @@ class HowdySeek:
                     # and it isn't included in section_states yet.
                     if prev_seats is None:
                         # Only send a notification if we have no record in DB or DB value differs from current
-                        if last_seat_count is None or last_seat_count != current_seats:
+                        if (last_seat_count is None or last_seat_count != current_seats) and current_seats != 0:
                             course = section["course"]
                             prof = section["prof"]
 

@@ -19,6 +19,7 @@ This contains the installation instructions for the backend and frontend.
 - Navigate to `chrome://profile-internals/` to find the correct Profile Path
 - Ensure the correct user data directory and profile is set in `backend/main.py`
 - Add all the courses you want to track to Aggie Schedule Builder
+- In Schedule Builder, change Course Status to `Open & Full` to see full classes as well.
 
 ## Frontend setup
   - `cd howdyseek-frontend`
