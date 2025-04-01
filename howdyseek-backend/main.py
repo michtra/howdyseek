@@ -574,7 +574,7 @@ class HowdySeek:
                 if section["course"] != current_course:
                     continue
 
-                # Handle sections that are currently visible
+                # Handle sections that are currently visible (should encompass all)
                 if crn in visible_sections:
                     prev_seats = self.section_states[current_course].get(crn, None)
                     current_seats = visible_sections[crn]
@@ -612,28 +612,23 @@ class HowdySeek:
                                 f'CRN: {crn}\n'
                                 f'Aggie Schedule Builder: {FALL_2025_URL}'
                             )
+                            
+                            # Alternative message
+                            if current_seats == 0:
+                                status = "Section Full"
+                                message = f'{course} with {prof} is now full.\nCRN: {crn}'
 
                             self._send_notification(webhook, status, message)
 
                     # Update state in memory and in database regardless of notification
                     self.section_states[current_course][crn] = current_seats
                     self._update_course_seat_count(webhook, crn, current_seats)
+                else:
+                    # At this point, assuming that the user has read the README and turned course status to Open & Full,
+                    # there shouldn't be any disabled classes.
+                    print(f"CRN {crn} not found in {course} visible sections")
+                    pass
 
-                # Handle sections that were previously visible but now aren't
-                elif crn in self.section_states[current_course]:
-                    prev_seats = self.section_states[current_course][crn]
-
-                    # Only notify if previously seats were available
-                    if prev_seats > 0:
-                        course = section["course"]
-                        prof = section["prof"]
-
-                        message = f'{course} with {prof} is now full.\nCRN: {crn}'
-                        self._send_notification(webhook, "Section Full", message)
-
-                    # Update state in memory and in database
-                    self.section_states[current_course][crn] = 0
-                    self._update_course_seat_count(webhook, crn, 0)
 
     def _send_notification(self, webhook: str, title: str, description: str):
         """Send a Discord notification.
