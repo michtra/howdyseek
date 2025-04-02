@@ -496,9 +496,103 @@ class HowdySeek:
             return text == "Enabled (0 of 0)"
         return False
 
+    def _process_section_changes(self, webhook, section, course, crn, prev_seats, current_seats):
+        """Process section changes and send notifications if needed.
+
+        Args:
+            webhook: The webhook URL to send notifications to
+            section: The section data from configuration
+            course: The course name
+            crn: The Course Registration Number
+            prev_seats: Previous seat count (or None if first check)
+            current_seats: Current seat count
+        """
+        # Get the last known seat count from DB
+        last_seat_count = section.get("last_seat_count")
+
+        # Check if this is the first time seeing this section
+        if prev_seats is None:
+            # Only send notification if we have no record in DB or DB value differs from current
+            if (last_seat_count is None or last_seat_count != current_seats) and current_seats > 0:
+                prof = section["prof"]
+
+                status = f'Seats Available ({current_seats})'
+
+                message = (
+                    f'{course} with {prof} is available.\n'
+                    f'CRN: {crn}\n'
+                    f'Aggie Schedule Builder: {FALL_2025_URL}'
+                )
+
+                self._send_notification(webhook, status, message)
+        else:
+            # We've seen this section before in this session
+            # Normal operation: send notification when seat count changes.
+            if prev_seats != current_seats:
+                prof = section["prof"]
+
+                status = f'Seat Change: {prev_seats} → {current_seats}'
+
+                message = (
+                    f'{course} with {prof} is available.\n'
+                    f'CRN: {crn}\n'
+                    f'Aggie Schedule Builder: {FALL_2025_URL}'
+                )
+
+                # Alternative message
+                if current_seats == 0:
+                    status = "Section Full"
+                    message = f'{course} with {prof} is now full.\nCRN: {crn}'
+
+                self._send_notification(webhook, status, message)
+
+        # Update state in memory and in database regardless of notification
+        self.section_states[course][crn] = current_seats
+        self._update_course_seat_count(webhook, crn, current_seats)
+
+    def _extract_sections(self, sections_dict):
+        """Extract section information from the current view.
+
+        Args:
+            sections_dict: Dictionary to store the extracted sections
+        """
+        labels = self.driver.find_elements(By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')
+
+        # Cool pattern: the CRN is every 6, and the seats open is every CRN index plus 3
+        # :-)
+        for label in range(0, len(labels), 6):
+            crn = labels[label].text
+            seats = int(labels[label + 3].text)
+            sections_dict[crn] = seats
+
+    def _switch_to_disabled_tab(self):
+        """Switch to the disabled tab if it exists.
+
+        Returns:
+            True if switched successfully, False otherwise
+        """
+        try:
+            disabled_tabs = self.driver.find_elements(
+                By.XPATH, '//*[@id="scheduler-app"]/div/main/div/div/div[2]/ul/li[2]/a/span'
+            )
+
+            if disabled_tabs:
+                disabled_tabs[0].click()
+                # Wait for the content to load (should load instantly)
+                WebDriverWait(self.driver, 5).until(
+                    EC.presence_of_element_located((By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss'))
+                )
+                return True
+            else:
+                print("Disabled tab does not exist, possibly invalid CRN input.")
+                return False
+        except Exception as e:
+            print(f"Error switching to disabled tab: {e}")
+            return False
+
     def check_sections(self, current_link: str):
         """Check for section availability changes and send notifications.
-        
+
         Args:
             current_link: The URL of the current tab
         """
@@ -536,99 +630,77 @@ class HowdySeek:
             except TimeoutException:
                 # In the case that there are no sections, could be errored or could have no sections
                 if self.has_no_sections():
+                    return
                     # Break and don't toggle success to True if errored
-                    break
 
-                # Otherwise refresh and retry. Could be a page error or just a timeout
+                # Otherwise refresh and retry because it's just a page error or a timeout
                 self.driver.get(current_link)
 
-        # At this point, success is True. There are sections to check.
-        # But if it's False, it's because there are no sections available from wait #1. Skip this class.
-        if not success:
-            return
-
-        # Extract section information
+        # At this point, success is True (there are sections to check), or we returned early.
+        # Extract section information from the enabled tab
         try:
-            labels = self.driver.find_elements(By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss')
-
-            # Cool pattern: the CRN is every 6, and the seats open is every CRN index plus 3
-            # :-)
-            for label in range(0, len(labels), 6):
-                crn = labels[label].text
-                seats = int(labels[label + 3].text)
-                visible_sections[crn] = seats
-
-        except Exception:
+            self._extract_sections(visible_sections)
+        except Exception as e:
+            print(f"Error extracting sections: {e}")
             return
 
-        # Process all sections and send notifications for changes
+        # Keep track of CRNs that haven't been found yet
+        missing_crns = []
+
+        # Process all sections from the current tab
         for webhook, classes in self.data.items():
             # Skip if the user has reached their stop time
             if self._user_past_stop_time(webhook):
                 continue
 
+            # Check every section
             for section in classes:
-                crn = section["crn"]
-
                 # Skip if the course doesn't match the current one
                 if section["course"] != current_course:
                     continue
 
-                # Handle sections that are currently visible (should encompass all)
+                crn = section["crn"]
+
+                # Handle sections that are currently visible
                 if crn in visible_sections:
                     prev_seats = self.section_states[current_course].get(crn, None)
                     current_seats = visible_sections[crn]
-                    last_seat_count = section.get("last_seat_count")
 
-                    # Condition: prev_seats is None if it's the first time check after startup
-                    # This is because the course is being checked for the first time,
-                    # and it isn't included in section_states yet.
-                    if prev_seats is None:
-                        # Only send a notification if we have no record in DB or DB value differs from current
-                        if (last_seat_count is None or last_seat_count != current_seats) and current_seats != 0:
-                            course = section["course"]
-                            prof = section["prof"]
-
-                            status = f'Seats Available ({current_seats})'
-
-                            message = (
-                                f'{course} with {prof} is available.\n'
-                                f'CRN: {crn}\n'
-                                f'Aggie Schedule Builder: {FALL_2025_URL}'
-                            )
-
-                            self._send_notification(webhook, status, message)
-                    else:
-                        # We've seen this section before in this session
-                        # Normal operation: send notification when seat count changes.
-                        if prev_seats != current_seats:
-                            course = section["course"]
-                            prof = section["prof"]
-
-                            status = f'Seat Change: {prev_seats} → {current_seats}'
-
-                            message = (
-                                f'{course} with {prof} is available.\n'
-                                f'CRN: {crn}\n'
-                                f'Aggie Schedule Builder: {FALL_2025_URL}'
-                            )
-                            
-                            # Alternative message
-                            if current_seats == 0:
-                                status = "Section Full"
-                                message = f'{course} with {prof} is now full.\nCRN: {crn}'
-
-                            self._send_notification(webhook, status, message)
-
-                    # Update state in memory and in database regardless of notification
-                    self.section_states[current_course][crn] = current_seats
-                    self._update_course_seat_count(webhook, crn, current_seats)
+                    # Process changes and send notifications if needed
+                    self._process_section_changes(
+                        webhook, section, current_course, crn,
+                        prev_seats, current_seats
+                    )
                 else:
-                    # At this point, assuming that the user has read the README and turned course status to Open & Full,
-                    # there shouldn't be any disabled classes.
-                    print(f"CRN {crn} not found in {course} visible sections")
-                    pass
+                    # Keep track of CRNs that weren't found
+                    missing_crns.append((webhook, section))
 
+        # If there are missing CRNs, check the "Disabled" tab
+        if missing_crns and self._switch_to_disabled_tab():
+            # Extract sections from the disabled tab
+            disabled_sections = {}
+            try:
+                self._extract_sections(disabled_sections)
+            except Exception as e:
+                print(f"Error extracting sections from disabled tab: {e}")
+                return
+
+            # Process the sections from the disabled tab
+            for webhook, section in missing_crns:
+                crn = section["crn"]
+
+                if crn in disabled_sections:
+                    prev_seats = self.section_states[current_course].get(crn, None)
+                    current_seats = disabled_sections[crn]
+
+                    # Process changes and send notifications if needed
+                    self._process_section_changes(
+                        webhook, section, current_course, crn,
+                        prev_seats, current_seats
+                    )
+                else:
+                    # Likely invalid CRN input
+                    print(f"CRN {crn} not found in {current_course} visible or disabled sections, likely invalid CRN.")
 
     def _send_notification(self, webhook: str, title: str, description: str):
         """Send a Discord notification.

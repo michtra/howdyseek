@@ -1,4 +1,4 @@
-# Total howdyseek W count: 14
+# Total howdyseek W count: 15
 
 ## Spring 2025
 1. STAT 212 with Patricia Ning (11am section > all)
@@ -17,3 +17,4 @@
 ## Fall 2025
 1. CSCE 412 with Merchant (average cloud computing enjoyer 💰)
 2. CSCE 465 with Saxena (early bird gets the worm) (howdyseek user got the first seat from this wave)
+3. CSCE 465 with Saxena (another early bird got the worm)
