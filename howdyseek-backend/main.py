@@ -584,7 +584,7 @@ class HowdySeek:
                 )
                 return True
             else:
-                print("Disabled tab does not exist, possibly invalid CRN input.")
+                print("Disabled tab does not exist, check for an invalid CRN input.")
                 return False
         except Exception as e:
             print(f"Error switching to disabled tab: {e}")
@@ -592,6 +592,7 @@ class HowdySeek:
 
     def check_sections(self, current_link: str):
         """Check for section availability changes and send notifications.
+        This method also handles refreshing for any page errors.
 
         Args:
             current_link: The URL of the current tab
@@ -700,7 +701,8 @@ class HowdySeek:
                     )
                 else:
                     # Likely invalid CRN input
-                    print(f"CRN {crn} not found in {current_course} visible or disabled sections, likely invalid CRN.")
+                    print(
+                        f"CRN {crn} not found in {current_course} visible or disabled sections, check for an invalid CRN input.")
 
     def _send_notification(self, webhook: str, title: str, description: str):
         """Send a Discord notification.
@@ -730,6 +732,7 @@ class HowdySeek:
             # Check for new courses every cycle
             self.check_for_new_courses()
 
+            # PHASE 1: Refresh all tabs first
             for window_handle in list(self.driver.window_handles):
                 if termination_event.is_set():
                     break
@@ -748,11 +751,41 @@ class HowdySeek:
                     current_link = self.tab_links[window_handle]
 
                     # Check for invalid page and redirect if needed
-                    if not self.redirect_if_invalid():
-                        self.driver.refresh()
+                    if self.redirect_if_invalid():
+                        # If we redirected, the page is already fresh
+                        pass
+                    else:
+                        # Reload page fully
+                        self.driver.get(current_link)
 
-                    # Check for section changes
-                    self.check_sections(current_link)
+                except NoSuchWindowException:
+                    # Remove this handle from our tracking
+                    if window_handle in self.tab_links:
+                        del self.tab_links[window_handle]
+                except WebDriverException:
+                    pass
+                except Exception:
+                    traceback.print_exc()
+                    pass
+
+            # PHASE 2: Now check each tab for section changes
+            for window_handle in list(self.driver.window_handles):
+                if termination_event.is_set():
+                    break
+
+                try:
+                    self.driver.switch_to.window(window_handle)
+
+                    # Skip invalid pages
+                    if "offscreen_compiled.js" in self.driver.page_source:
+                        continue
+
+                    current_link = self.tab_links.get(window_handle)
+                    if current_link:
+                        # One last invalid page check
+                        self.redirect_if_invalid()
+                        # Check for section changes
+                        self.check_sections(current_link)
 
                 except NoSuchWindowException:
                     # Remove this handle from our tracking

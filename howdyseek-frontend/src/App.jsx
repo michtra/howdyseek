@@ -106,7 +106,7 @@ const App = () => {
         const isoDate = new Date(
             localDate.getTime() - (localDate.getTimezoneOffset() * 60000)
         ).toISOString();
-        
+
         return isoDate;
     };
 
@@ -130,7 +130,7 @@ const App = () => {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    name, 
+                    name,
                     webhook_url: webhookUrl,
                     stop_time: stopTime ? localDateTimeToISO(stopTime) : null
                 }),
@@ -154,11 +154,11 @@ const App = () => {
 
     const handleUpdateUserSettings = async (e) => {
         e.preventDefault();
-        
+
         if (!selectedUser) return;
-        
+
         const stopTime = userSettingsFormRef.current.elements.stop_time.value;
-        
+
         try {
             const response = await fetch(`${API_BASE_URL}/users/${selectedUser.id}`, {
                 method: 'PUT',
@@ -173,14 +173,14 @@ const App = () => {
             if (!response.ok) throw new Error('Failed to update user');
 
             const updatedUser = await response.json();
-            
-            setUsers(prevUsers => 
-                prevUsers.map(user => 
+
+            setUsers(prevUsers =>
+                prevUsers.map(user =>
                     user.id === updatedUser.id ? updatedUser : user
                 )
             );
             setSelectedUser(updatedUser);
-            
+
             alert('User settings updated successfully!');
         }
         catch (error) {
@@ -192,13 +192,30 @@ const App = () => {
     const handleAddCourse = async (e) => {
         e.preventDefault();
 
-        // Get values directly from form elements
-        const courseName = courseFormRef.current.elements.course_name.value;
-        const crn = courseFormRef.current.elements.crn.value;
-        const professor = courseFormRef.current.elements.professor.value;
+        // Get values directly from form elements and trim them
+        const courseName = courseFormRef.current.elements.course_name.value.trim();
+        const crn = courseFormRef.current.elements.crn.value.trim();
+        const professor = courseFormRef.current.elements.professor.value.trim();
 
-        if (!courseName || !crn || !professor) {
-            alert('Please fill in all fields');
+        // Validate inputs
+        if (!courseName) {
+            alert('Please enter a course name');
+            return;
+        }
+
+        if (!crn) {
+            alert('Please enter a CRN');
+            return;
+        }
+
+        // Validate CRN is numeric only
+        if (!/^\d+$/.test(crn)) {
+            alert('CRN must contain only numbers');
+            return;
+        }
+
+        if (!professor) {
+            alert('Please enter a professor name');
             return;
         }
 
@@ -343,16 +360,16 @@ const App = () => {
     // Correctly present the datetime in the input field
     const formatDateTimeForInput = (isoString) => {
         if (!isoString) return '';
-        
+
         // Create a date object that properly considers the timezone in the ISO string
         const date = new Date(isoString);
-        
+
         // Format for datetime-local input (YYYY-MM-DDTHH:MM)
         // Adjust for timezone to display the correct local time
         const localDateTime = new Date(
             date.getTime() - (date.getTimezoneOffset() * 60000)
         ).toISOString().slice(0, 16);
-        
+
         return localDateTime;
     };
 
@@ -573,15 +590,17 @@ const App = () => {
                                                                     </td>
                                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                                         {course.last_seat_count !== null ? (
-                                                                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                                                course.last_seat_count > 0 
-                                                                                    ? 'bg-green-100 text-green-800' 
-                                                                                    : 'bg-red-100 text-red-800'
-                                                                            }`}>
+                                                                            <span
+                                                                                className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                                                                    course.last_seat_count > 0
+                                                                                        ? 'bg-green-100 text-green-800'
+                                                                                        : 'bg-red-100 text-red-800'
+                                                                                }`}>
                                                                                 {course.last_seat_count}
                                                                             </span>
                                                                         ) : (
-                                                                            <span className="text-gray-500 text-sm">Unknown</span>
+                                                                            <span
+                                                                                className="text-gray-500 text-sm">Unknown</span>
                                                                         )}
                                                                     </td>
                                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -603,7 +622,8 @@ const App = () => {
                                         ) : (
                                             <div className="max-w-md mx-auto">
                                                 <h3 className="text-lg font-medium mb-4">User Settings</h3>
-                                                <form ref={userSettingsFormRef} onSubmit={handleUpdateUserSettings} className="space-y-4">
+                                                <form ref={userSettingsFormRef} onSubmit={handleUpdateUserSettings}
+                                                      className="space-y-4">
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700">User
                                                             Name</label>
@@ -625,7 +645,8 @@ const App = () => {
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-sm font-medium text-gray-700">Stop Time</label>
+                                                        <label className="block text-sm font-medium text-gray-700">Stop
+                                                            Time</label>
                                                         <input
                                                             type="datetime-local"
                                                             name="stop_time"
@@ -633,7 +654,8 @@ const App = () => {
                                                             defaultValue={formatDateTimeForInput(selectedUser.stop_time)}
                                                         />
                                                         <p className="mt-1 text-xs text-gray-500">
-                                                            When should monitoring stop for this user? Leave empty for indefinite monitoring.
+                                                            When should we monitoring stop for this user? Leave empty for
+                                                            indefinite monitoring.
                                                         </p>
                                                     </div>
                                                     <div className="pt-2 flex space-x-4">
@@ -753,8 +775,18 @@ const App = () => {
                             type="text"
                             name="crn"
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
-                            placeholder="123456"
+                            placeholder="12345"
+                            pattern="\d*"
+                            maxLength="5"
+                            inputMode="numeric"
+                            onChange={(e) => {
+                                // Allow only digits
+                                e.target.value = e.target.value.replace(/\D/g, '');
+                            }}
                         />
+                        <p className="mt-1 text-xs text-gray-500">
+                            Enter the 5-digit Course Registration Number
+                        </p>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Professor</label>
