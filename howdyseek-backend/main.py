@@ -562,7 +562,11 @@ class HowdySeek:
         # :-)
         for label in range(0, len(labels), 6):
             crn = labels[label].text
-            seats = int(labels[label + 3].text)
+            # Sometimes seat count may not fully render, just use 0
+            try:
+                seats = int(labels[label + 3].text)
+            except ValueError:
+                seats = 0
             sections_dict[crn] = seats
 
     def _switch_to_disabled_tab(self):
@@ -843,12 +847,12 @@ def run_discord_bot():
                         for user in users:
                             total_courses += len(user['courses'])
 
-                        courses_text = "course" if total_courses == 1 else "courses"
+                        courses_text = "CRN" if total_courses == 1 else "CRNs"
                         users_text = "user" if active_users == 1 else "users"
 
                         # Set the custom activity
                         activity = discord.Activity(
-                            name=f"{total_courses} {courses_text} for {active_users} {users_text} :P",
+                            name=f"{total_courses} {courses_text} for {active_users} {users_text} 😛",
                             type=discord.ActivityType.watching
                         )
                         await client.change_presence(activity=activity)

@@ -5,6 +5,8 @@ bulletproof and ready with a frontend for fall 2025 preregistration + open regis
 
 howdyseek (aka michaelseek) > all
 
+dropping your course is NO LONGER safe ❌
+
 # Description
 This program uses Selenium to loop through your added courses on Aggie Schedule Builder and clicks on each one's information
 regarding sections with available seats to notify you through a Discord webhook.
