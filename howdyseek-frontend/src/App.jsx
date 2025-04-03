@@ -157,6 +157,7 @@ const App = () => {
 
         if (!selectedUser) return;
 
+        const name = userSettingsFormRef.current.elements.name.value;
         const stopTime = userSettingsFormRef.current.elements.stop_time.value;
 
         try {
@@ -166,6 +167,7 @@ const App = () => {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
+                    name: name,
                     stop_time: stopTime ? localDateTimeToISO(stopTime) : null
                 }),
             });
@@ -629,9 +631,9 @@ const App = () => {
                                                             Name</label>
                                                         <input
                                                             type="text"
+                                                            name="name"
                                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
-                                                            value={selectedUser.name}
-                                                            readOnly
+                                                            defaultValue={selectedUser.name}
                                                         />
                                                     </div>
                                                     <div>

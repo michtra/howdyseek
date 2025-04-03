@@ -78,12 +78,13 @@ class HowdySeek:
     def _setup_webdriver() -> webdriver.Chrome:
         """Configure and return a webdriver."""
         chrome_options = Options()
-        chrome_options.add_argument("--no-sandbox")
-        # bug fix
-        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument("--start-maximized")
+        chrome_options.add_argument("--headless=new")
+        chrome_options.add_argument("--no-sandbox")  # bug fix
+        chrome_options.add_argument("--disable-extensions")  # bug fix
         chrome_options.add_argument(USER_DATA_DIR_ARG)
         chrome_options.add_argument(PROFILE_DIR_ARG)
-        chrome_options.add_experimental_option('detach', True)
         return webdriver.Chrome(options=chrome_options)
 
     @staticmethod
@@ -496,60 +497,6 @@ class HowdySeek:
             return text == "Enabled (0 of 0)"
         return False
 
-    def _process_section_changes(self, webhook, section, course, crn, prev_seats, current_seats):
-        """Process section changes and send notifications if needed.
-
-        Args:
-            webhook: The webhook URL to send notifications to
-            section: The section data from configuration
-            course: The course name
-            crn: The Course Registration Number
-            prev_seats: Previous seat count (or None if first check)
-            current_seats: Current seat count
-        """
-        # Get the last known seat count from DB
-        last_seat_count = section.get("last_seat_count")
-
-        # Check if this is the first time seeing this section
-        if prev_seats is None:
-            # Only send notification if we have no record in DB or DB value differs from current
-            if (last_seat_count is None or last_seat_count != current_seats) and current_seats > 0:
-                prof = section["prof"]
-
-                status = f'Seats Available ({current_seats})'
-
-                message = (
-                    f'{course} with {prof} is available.\n'
-                    f'CRN: {crn}\n'
-                    f'Aggie Schedule Builder: {FALL_2025_URL}'
-                )
-
-                self._send_notification(webhook, status, message)
-        else:
-            # We've seen this section before in this session
-            # Normal operation: send notification when seat count changes.
-            if prev_seats != current_seats:
-                prof = section["prof"]
-
-                status = f'Seat Change: {prev_seats} → {current_seats}'
-
-                message = (
-                    f'{course} with {prof} is available.\n'
-                    f'CRN: {crn}\n'
-                    f'Aggie Schedule Builder: {FALL_2025_URL}'
-                )
-
-                # Alternative message
-                if current_seats == 0:
-                    status = "Section Full"
-                    message = f'{course} with {prof} is now full.\nCRN: {crn}'
-
-                self._send_notification(webhook, status, message)
-
-        # Update state in memory and in database regardless of notification
-        self.section_states[course][crn] = current_seats
-        self._update_course_seat_count(webhook, crn, current_seats)
-
     def _extract_sections(self, sections_dict):
         """Extract section information from the current view.
 
@@ -652,6 +599,9 @@ class HowdySeek:
         # Keep track of CRNs that haven't been found yet
         missing_crns = []
 
+        # Store current sections to update after all notifications are sent
+        sections_to_update = []
+
         # Process all sections from the current tab
         for webhook, classes in self.data.items():
             # Skip if the user has reached their stop time
@@ -671,11 +621,14 @@ class HowdySeek:
                     prev_seats = self.section_states[current_course].get(crn, None)
                     current_seats = visible_sections[crn]
 
-                    # Process changes and send notifications if needed
-                    self._process_section_changes(
+                    # Send notification if needed
+                    self._send_section_notification(
                         webhook, section, current_course, crn,
                         prev_seats, current_seats
                     )
+
+                    # Add to list of sections to update
+                    sections_to_update.append((webhook, crn, current_seats))
                 else:
                     # Keep track of CRNs that weren't found
                     missing_crns.append((webhook, section))
@@ -698,15 +651,79 @@ class HowdySeek:
                     prev_seats = self.section_states[current_course].get(crn, None)
                     current_seats = disabled_sections[crn]
 
-                    # Process changes and send notifications if needed
-                    self._process_section_changes(
+                    # Send notification if needed
+                    self._send_section_notification(
                         webhook, section, current_course, crn,
                         prev_seats, current_seats
                     )
+
+                    # Add to list of sections to update
+                    sections_to_update.append((webhook, crn, current_seats))
                 else:
                     # Likely invalid CRN input
                     print(
                         f"CRN {crn} not found in {current_course} visible or disabled sections, check for an invalid CRN input.")
+
+        # Update all sections after processing notifications
+        processed_crns = set()
+        for webhook, crn, current_seats in sections_to_update:
+            # Update in-memory state only once per CRN
+            if crn not in processed_crns:
+                self.section_states[current_course][crn] = current_seats
+                processed_crns.add(crn)
+
+            # Always update database for each webhook-CRN combination
+            self._update_course_seat_count(webhook, crn, current_seats)
+
+    def _send_section_notification(self, webhook, section, course, crn, prev_seats, current_seats):
+        """Determine if a notification should be sent for a section change and send it if needed.
+
+        Args:
+            webhook: The webhook URL to send notifications to
+            section: The section data from configuration
+            course: The course name
+            crn: The Course Registration Number
+            prev_seats: Previous seat count (or None if first check)
+            current_seats: Current seat count
+        """
+        # Get the last known seat count from DB
+        last_seat_count = section.get("last_seat_count")
+
+        # Check if this is the first time seeing this section
+        if prev_seats is None:
+            # Only send notification if we have no record in DB or DB value differs from current
+            if (last_seat_count is None or last_seat_count != current_seats) and current_seats > 0:
+                prof = section["prof"]
+
+                status = f'Seats Available ({current_seats})'
+
+                message = (
+                    f'{course} with {prof} is available.\n'
+                    f'CRN: {crn}\n'
+                    f'Aggie Schedule Builder: {FALL_2025_URL}'
+                )
+
+                self._send_notification(webhook, status, message)
+        else:
+            # We've seen this section before in this session
+            # Normal operation: send notification when seat count changes.
+            if prev_seats != current_seats:
+                prof = section["prof"]
+
+                status = f'Seat Change: {prev_seats} → {current_seats}'
+
+                message = (
+                    f'{course} with {prof} is available.\n'
+                    f'CRN: {crn}\n'
+                    f'Aggie Schedule Builder: {FALL_2025_URL}'
+                )
+
+                # Alternative message
+                if current_seats == 0:
+                    status = "Section Full"
+                    message = f'{course} with {prof} is now full.\nCRN: {crn}'
+
+                self._send_notification(webhook, status, message)
 
     def _send_notification(self, webhook: str, title: str, description: str):
         """Send a Discord notification.

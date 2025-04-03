@@ -34,3 +34,6 @@ This contains the installation instructions for the backend and frontend.
   - This is because when not fully zoomed in, the tab creation does not correctly find courses
 - Run the python script after setting up users and courses through the frontend
   - `python backend/main.py`
+
+## Adding courses
+As a prerequisite to adding a course to track, ensure the course is added to Schedule Builder.
