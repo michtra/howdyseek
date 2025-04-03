@@ -6,7 +6,7 @@ import random
 import re
 import time
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import threading
 import asyncio
 import signal
@@ -121,10 +121,15 @@ class HowdySeek:
                 # Store stop time for each user keyed by webhook
                 webhook = user['webhook_url']
                 if user['stop_time']:
+                    # Parse ISO time
                     stop_time = datetime.fromisoformat(user['stop_time'])
                     # Ensure it has timezone info
                     if stop_time.tzinfo is None:
-                        stop_time = stop_time.replace(tzinfo=timezone.utc)
+                        # Mark as CDT
+                        cdt_offset = timezone(timedelta(hours=-5))
+                        stop_time = stop_time.replace(tzinfo=cdt_offset)
+                        # But use UTC internally
+                        stop_time = stop_time.astimezone(timezone.utc)
                     self.user_stop_times[webhook] = stop_time
                 elif webhook in self.user_stop_times:
                     # Remove any previously set stop time if it's now null
