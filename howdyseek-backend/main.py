@@ -56,6 +56,7 @@ def signal_handler(sig, frame):
 
 # Global tracking variables
 FIRST_TAB_CREATED = False
+COURSE_NAME_PATTERN = re.compile(r"(\w+ \d+)")
 
 
 class HowdySeek:
@@ -295,7 +296,7 @@ class HowdySeek:
                     # Extract the course name from the element
                     course = course_element.find_elements(By.XPATH, './*')[1].get_attribute('innerText')
                     # Bug fix: use regex grab the correct course name. new format as of Fall 2025 registration
-                    match = re.match(r"(\w+ \d+)", course)
+                    match = COURSE_NAME_PATTERN.match(course)
                     course = match.group(1)
 
                     # Found a matching course with our json, let us designate this tab for that course
@@ -349,7 +350,7 @@ class HowdySeek:
                 # Extract the course name from the element
                 course = course_element.find_elements(By.XPATH, './*')[1].get_attribute('innerText')
                 # Bug fix: use regex grab the correct course name. new format as of Fall 2025 registration
-                match = re.match(r"(\w+ \d+)", course)
+                match = COURSE_NAME_PATTERN.match(course)
                 course = match.group(1)
 
                 # Found a matching course with our json, let us designate this tab for that course
@@ -410,7 +411,7 @@ class HowdySeek:
                     # Extract the course name from the element
                     course = course_element.find_elements(By.XPATH, './*')[1].get_attribute('innerText')
                     # Bug fix: use regex grab the correct course name. new format as of Fall 2025 registration
-                    match = re.match(r"(\w+ \d+)", course)
+                    match = COURSE_NAME_PATTERN.match(course)
                     course = match.group(1)
 
                     # Found a matching course with our json, let us designate this tab for that course
