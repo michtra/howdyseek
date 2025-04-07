@@ -8,7 +8,19 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c257e76c-dd87-45a4-892d-dcd39814834f" name="Changes" comment="" />
+    <list default="true" id="c257e76c-dd87-45a4-892d-dcd39814834f" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources/be2c0ff0-369b-49d4-b793-edc5667f3518.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/af744dbd-66fb-4324-822a-09767ba0d063.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources/be2c0ff0-369b-49d4-b793-edc5667f3518/storage_v2/_src_/schema/main.uQUzAA.meta" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/af744dbd-66fb-4324-822a-09767ba0d063/storage_v2/_src_/schema/main.uQUzAA.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/INSTALLATION.md" beforeDir="false" afterPath="$PROJECT_DIR$/INSTALLATION.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howdyseek-backend/api.py" beforeDir="false" afterPath="$PROJECT_DIR$/howdyseek-backend/api.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howdyseek-backend/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/howdyseek-backend/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howdyseek-backend/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/howdyseek-backend/models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howdyseek-frontend/src/App.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/howdyseek-frontend/src/App.jsx" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -25,7 +37,7 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="ProblemsViewState">
-    <option name="selectedTabId" value="CurrentFile" />
+    <option name="selectedTabId" value="DEPENDENCY_CHECKER_PROBLEMS_TAB" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 4
@@ -37,12 +49,13 @@
   </component>
   <component name="PropertiesComponent">{
   &quot;keyToString&quot;: {
-    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Python tests in api.py.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.main.executor&quot;: &quot;Debug&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/home/michael/Documents/howdyseek&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/michael/Documents/howdyseek/howdyseek-backend&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -56,6 +69,7 @@
 }</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/howdyseek-backend" />
       <recent name="$PROJECT_DIR$/frontend/src" />
       <recent name="$PROJECT_DIR$/frontend" />
     </key>
@@ -70,7 +84,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-js-predefined-d6986cc7102b-1632447f56bf-JavaScript-WS-243.26053.12" />
+        <option value="bundled-js-predefined-d6986cc7102b-1632447f56bf-JavaScript-PY-243.25659.43" />
+        <option value="bundled-python-sdk-181015f7ab06-4df51de95216-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-243.25659.43" />
       </set>
     </attachedChunks>
   </component>
@@ -109,6 +124,10 @@
       <workItem from="1743608664083" duration="67000" />
       <workItem from="1743648512358" duration="1950000" />
       <workItem from="1743651887856" duration="2822000" />
+      <workItem from="1744052703231" duration="622000" />
+      <workItem from="1744053384417" duration="22000" />
+      <workItem from="1744056621577" duration="5737000" />
+      <workItem from="1744063644692" duration="2987000" />
     </task>
     <servers />
   </component>
@@ -116,6 +135,7 @@
     <option name="version" value="3" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/howdyseek$main.coverage" NAME="main Coverage Results" MODIFIED="1743653380702" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/howdyseek-backend" />
+    <SUITE FILE_PATH="coverage/howdyseek$main.coverage" NAME="main Coverage Results" MODIFIED="1744054984857" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/howdyseek-backend" />
+    <SUITE FILE_PATH="coverage/howdyseek$.coverage" NAME=" Coverage Results" MODIFIED="1744054960279" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/howdyseek-backend" />
   </component>
 </project>

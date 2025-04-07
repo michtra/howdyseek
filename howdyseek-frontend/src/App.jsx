@@ -250,18 +250,24 @@ const App = () => {
     };
 
     const handleDeleteCourse = async (courseId) => {
+        if (!window.confirm('Are you sure you want to delete this course?')) {
+            return;
+        }
+
         try {
-            const response = await fetch(`${API_BASE_URL}/courses/${courseId}`, {
+            // Remove course from the user
+            const response = await fetch(`${API_BASE_URL}/users/${selectedUser.id}/courses/${courseId}`, {
                 method: 'DELETE',
             });
 
-            if (!response.ok) throw new Error('Failed to delete course');
+            if (!response.ok) throw new Error('Failed to remove course');
 
+            // Update the local state to remove the course
             setCourses(courses.filter(course => course.id !== courseId));
         }
         catch (error) {
-            console.error('Error deleting course:', error);
-            alert('Failed to delete course: ' + error.message);
+            console.error('Error removing course:', error);
+            alert('Failed to remove course: ' + error.message);
         }
     };
 
@@ -611,7 +617,7 @@ const App = () => {
                                                                             onClick={() => handleDeleteCourse(course.id)}
                                                                         >
                                                                             <Trash2 size={16} className="mr-1"/>
-                                                                            Delete
+                                                                            Remove
                                                                         </button>
                                                                     </td>
                                                                 </tr>

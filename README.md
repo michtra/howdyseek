@@ -36,9 +36,21 @@ a term selection again. Therefore, the term has to be selected on the initial pa
 - id (PK): Integer
 - course_name: String
 - professor: String
-- crn: String
+- crn: String (Unique)
 - last_seat_count: Integer (Nullable, for tracking seat changes)
+- last_updated: DateTime (When seat count was last updated)
+
+## user_courses (Junction Table)
+- user_id (PK, FK): Integer (References users.id)
+- course_id (PK, FK): Integer (References courses.id)
+
+## NotificationHistory
+- id (PK): Integer
 - user_id (FK): Integer (References users.id)
+- course_id (FK): Integer (References courses.id)
+- seat_count: Integer (Seat count at time of notification)
+- notification_time: DateTime (When notification was sent)
+- notification_type: String (initial, change, or full)
 
 # NFAQ (non-frequently asked questions)
 - Q: Why is the name of this 'howdyseek (하우디 시크)?'

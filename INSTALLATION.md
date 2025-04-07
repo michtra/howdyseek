@@ -6,7 +6,7 @@ This contains the installation instructions for the backend and frontend.
 - Install requirements from requirements.txt
   - `pip install -r requirements.txt`
 - Start the API server
-  - `uvicorn api:app --reload --host 0.0.0.0 --port 8000`
+  - `uvicorn api:app --reload --log-level critical --host 0.0.0.0 --port 8000`
 
 ### Discord Bot Status
 - Create a Discord bot (https://discord.com/developers/docs/intro)

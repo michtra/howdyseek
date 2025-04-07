@@ -11,6 +11,7 @@ import threading
 import asyncio
 import signal
 import sys
+from typing import Any
 
 import requests
 from selenium import webdriver
@@ -142,7 +143,8 @@ class HowdySeek:
                         "prof": course['professor'],
                         "course": course['course_name'],
                         "crn": course['crn'],
-                        "last_seat_count": course.get('last_seat_count')
+                        "last_seat_count": course.get('last_seat_count'),
+                        "course_id": course['id']  # Store course ID for notifications
                     })
 
                 if courses:  # Only add to config if there are courses
@@ -183,45 +185,48 @@ class HowdySeek:
             return current_time > stop_time
         return False
 
-    def _update_course_seat_count(self, webhook: str, crn: str, seats: int):
-        """Update the last known seat count for a course in the database."""
+    def _get_user_id_by_webhook(self, webhook: str) -> Any | None:
+        """Get a user ID given their webhook URL."""
         try:
-            # First, find the user by webhook URL
             response = requests.get(f"{API_BASE_URL}/users/")
             if response.status_code != 200:
                 print(f"Failed to fetch users: {response.text}")
-                return
+                return None
 
             users = response.json()
-            user_id = None
-            course_id = None
-
-            # Find the user and course IDs
-            course_data = None
             for user in users:
                 if user['webhook_url'] == webhook:
-                    user_id = user['id']
-                    for course in user['courses']:
-                        if course['crn'] == crn:
-                            course_id = course['id']
-                            course_data = course  # Store the entire course data object
-                            break
-                    break
+                    return user['id']
+            return None
+        except Exception as e:
+            print(f"Error getting user ID by webhook: {e}")
+            traceback.print_exc()
+            return None
 
-            if user_id is not None and course_id is not None and course_data is not None:
-                # Update the course's last_seat_count
-                response = requests.put(
-                    f"{API_BASE_URL}/courses/{course_id}",
-                    json={
-                        "course_name": course_data['course_name'],
-                        "professor": course_data['professor'],
-                        "crn": crn,
-                        "last_seat_count": seats
-                    }
-                )
+    def _update_course_seat_count(self, course_id: int, seats: int):
+        """Update the last known seat count for a course in the database."""
+        try:
+            # Get the course details first
+            response = requests.get(f"{API_BASE_URL}/courses/{course_id}")
+            if response.status_code != 200:
+                print(f"Failed to fetch course: {response.text}")
+                return
 
-                if response.status_code != 200:
-                    print(f"Failed to update course seat count: {response.text}")
+            course_data = response.json()
+
+            # Update the course's last_seat_count
+            response = requests.put(
+                f"{API_BASE_URL}/courses/{course_id}",
+                json={
+                    "course_name": course_data['course_name'],
+                    "professor": course_data['professor'],
+                    "crn": course_data['crn'],
+                    "last_seat_count": seats
+                }
+            )
+
+            if response.status_code != 200:
+                print(f"Failed to update course seat count: {response.text}")
         except Exception as e:
             print(f"Error updating course seat count: {e}")
             traceback.print_exc()
@@ -614,6 +619,11 @@ class HowdySeek:
             if self._user_past_stop_time(webhook):
                 continue
 
+            # Get the user ID for this webhook (for notification history)
+            user_id = self._get_user_id_by_webhook(webhook)
+            if user_id is None:
+                continue
+
             # Check every section
             for section in classes:
                 # Skip if the course doesn't match the current one
@@ -621,6 +631,11 @@ class HowdySeek:
                     continue
 
                 crn = section["crn"]
+                course_id = section.get("course_id")
+
+                # If we don't have a course ID, skip this section
+                if course_id is None:
+                    continue
 
                 # Handle sections that are currently visible
                 if crn in visible_sections:
@@ -629,15 +644,15 @@ class HowdySeek:
 
                     # Send notification if needed
                     self._send_section_notification(
-                        webhook, section, current_course, crn,
+                        webhook, user_id, section, course_id, current_course, crn,
                         prev_seats, current_seats
                     )
 
                     # Add to list of sections to update
-                    sections_to_update.append((webhook, crn, current_seats))
+                    sections_to_update.append((course_id, current_seats))
                 else:
                     # Keep track of CRNs that weren't found
-                    missing_crns.append((webhook, section))
+                    missing_crns.append((webhook, user_id, section, course_id))
 
         # If there are missing CRNs, check the "Disabled" tab
         if missing_crns and self._switch_to_disabled_tab():
@@ -650,7 +665,7 @@ class HowdySeek:
                 return
 
             # Process the sections from the disabled tab
-            for webhook, section in missing_crns:
+            for webhook, user_id, section, course_id in missing_crns:
                 crn = section["crn"]
 
                 if crn in disabled_sections:
@@ -659,77 +674,175 @@ class HowdySeek:
 
                     # Send notification if needed
                     self._send_section_notification(
-                        webhook, section, current_course, crn,
+                        webhook, user_id, section, course_id, current_course, crn,
                         prev_seats, current_seats
                     )
 
                     # Add to list of sections to update
-                    sections_to_update.append((webhook, crn, current_seats))
+                    sections_to_update.append((course_id, current_seats))
                 else:
-                    # Likely invalid CRN input
-                    print(
-                        f"CRN {crn} not found in {current_course} visible or disabled sections, check for an invalid CRN input.")
+                    print(f"CRN {crn} not found in {current_course} visible or disabled sections.")
 
         # Update all sections after processing notifications
         processed_crns = set()
-        for webhook, crn, current_seats in sections_to_update:
-            # Update in-memory state only once per CRN
-            if crn not in processed_crns:
+        for course_id, current_seats in sections_to_update:
+            # Extract CRN from the data
+            crn = None
+            for webhook, classes in self.data.items():
+                for section in classes:
+                    if section.get("course_id") == course_id:
+                        crn = section["crn"]
+                        break
+                if crn:
+                    break
+
+            if crn and crn not in processed_crns:
+                # Update in-memory state
                 self.section_states[current_course][crn] = current_seats
                 processed_crns.add(crn)
 
-            # Always update database for each webhook-CRN combination
-            self._update_course_seat_count(webhook, crn, current_seats)
+            # Always update database for each course
+            self._update_course_seat_count(course_id, current_seats)
 
-    def _send_section_notification(self, webhook, section, course, crn, prev_seats, current_seats):
+    def _record_notification(self, user_id: int, course_id: int, seat_count: int, notification_type: str):
+        """Record a notification in the database.
+        
+        Args:
+            user_id: The user's ID
+            course_id: The course's ID
+            seat_count: The current seat count
+            notification_type: The type of notification (initial, change, full)
+        """
+        try:
+            # Create the notification record
+            response = requests.post(
+                f"{API_BASE_URL}/notifications/",
+                json={
+                    "user_id": user_id,
+                    "course_id": course_id,
+                    "seat_count": seat_count,
+                    "notification_type": notification_type
+                }
+            )
+
+            if response.status_code != 201:
+                print(f"Failed to create notification record: {response.text}")
+
+        except Exception as e:
+            print(f"Error recording notification: {e}")
+            traceback.print_exc()
+
+    def _get_latest_notification(self, user_id: int, course_id: int):
+        """Get the latest notification for a user and course from the database.
+        
+        Args:
+            user_id: The user's ID
+            course_id: The course's ID
+            
+        Returns:
+            The latest notification or None if no notifications exist
+        """
+        try:
+            response = requests.get(f"{API_BASE_URL}/users/{user_id}/notifications")
+            if response.status_code != 200:
+                print(f"Failed to fetch notifications: {response.text}")
+                return None
+
+            notifications = response.json()
+
+            # Filter notifications for this course and find the most recent one
+            course_notifications = [n for n in notifications if n['course_id'] == course_id]
+            if not course_notifications:
+                return None
+
+            # Sort by notification_time in descending order and take the first one
+            latest = sorted(
+                course_notifications,
+                key=lambda n: datetime.fromisoformat(n['notification_time']),
+                reverse=True
+            )[0]
+
+            return latest
+        except Exception as e:
+            print(f"Error getting latest notification: {e}")
+            traceback.print_exc()
+            return None
+
+    def _send_section_notification(self, webhook, user_id, section, course_id, course, crn, prev_seats, current_seats):
         """Determine if a notification should be sent for a section change and send it if needed.
 
         Args:
             webhook: The webhook URL to send notifications to
+            user_id: The user's ID
             section: The section data from configuration
+            course_id: The course's ID
             course: The course name
             crn: The Course Registration Number
             prev_seats: Previous seat count (or None if first check)
             current_seats: Current seat count
         """
-        # Get the last known seat count from DB
-        last_seat_count = section.get("last_seat_count")
+        # Get the latest notification from the database for this specific user and course
+        latest_notification = self._get_latest_notification(user_id, course_id)
 
-        # Check if this is the first time seeing this section
-        if prev_seats is None:
-            # Only send notification if we have no record in DB or DB value differs from current
-            if (last_seat_count is None or last_seat_count != current_seats) and current_seats > 0:
-                prof = section["prof"]
+        # Check if this is the first time this specific user is seeing this section
+        # (user has no notification history for this course)
+        is_first_notification = latest_notification is None
 
-                status = f'Seats Available ({current_seats})'
+        # If we have prev_seats from memory, use that, otherwise use DB value if available
+        if prev_seats is None and latest_notification is not None:
+            prev_seats = latest_notification['seat_count']
 
-                message = (
-                    f'{course} with {prof} is available.\n'
-                    f'CRN: {crn}\n'
-                    f'Aggie Schedule Builder: {FALL_2025_URL}'
-                )
+        prof = section["prof"]
 
-                self._send_notification(webhook, status, message)
-        else:
-            # We've seen this section before in this session
-            # Normal operation: send notification when seat count changes.
-            if prev_seats != current_seats:
-                prof = section["prof"]
+        # Always send initial notification to a user who hasn't received one for this course yet
+        if is_first_notification and current_seats > 0:
+            status = f'Seats Available ({current_seats})'
+            message = (
+                f'{course} with {prof} is available.\n'
+                f'CRN: {crn}\n'
+                f'Aggie Schedule Builder: {FALL_2025_URL}'
+            )
 
+            # Send initial notification - every user should get their first notification
+            # regardless of whether another user already has notifications for this course
+            self._send_notification(webhook, status, message)
+
+            # Record the notification
+            self._record_notification(user_id, course_id, current_seats, "initial")
+
+        # For subsequent notifications, check if seat count changed
+        elif prev_seats is not None and prev_seats != current_seats:
+            # Determine notification type
+            if current_seats == 0:
+                notification_type = "full"
+                status = "Section Full"
+                message = f'{course} with {prof} is now full.\nCRN: {crn}'
+            else:
+                notification_type = "change"
                 status = f'Seat Change: {prev_seats} → {current_seats}'
-
                 message = (
                     f'{course} with {prof} is available.\n'
                     f'CRN: {crn}\n'
                     f'Aggie Schedule Builder: {FALL_2025_URL}'
                 )
 
-                # Alternative message
-                if current_seats == 0:
-                    status = "Section Full"
-                    message = f'{course} with {prof} is now full.\nCRN: {crn}'
+            # Send notification
+            self._send_notification(webhook, status, message)
 
-                self._send_notification(webhook, status, message)
+            # Record the notification
+            self._record_notification(user_id, course_id, current_seats, notification_type)
+        # Handle the case where prev_seats is None, but we need to send a notification
+        elif prev_seats is None and not is_first_notification and current_seats > 0:
+            # We couldn't determine previous state but still should notify about available seats
+            status = f'Seats Available ({current_seats})'
+            message = (
+                f'{course} with {prof} is available.\n'
+                f'CRN: {crn}\n'
+                f'Aggie Schedule Builder: {FALL_2025_URL}'
+            )
+
+            self._send_notification(webhook, status, message)
+            self._record_notification(user_id, course_id, current_seats, "update")
 
     def _send_notification(self, webhook: str, title: str, description: str):
         """Send a Discord notification.
@@ -776,6 +889,16 @@ class HowdySeek:
                         self.tab_links[window_handle] = self.driver.current_url
 
                     current_link = self.tab_links[window_handle]
+
+                    # Wait for page to load before refreshing
+                    # Is an issue with lower tracking counts
+                    try:
+                        WebDriverWait(self.driver, 3).until(
+                            EC.presence_of_element_located((By.CLASS_NAME, 'css-1p12g40-cellCss-hideOnMobileCss'))
+                        )
+                    except TimeoutException:
+                        # It's okay if we time out - could be a page with no sections (shouldn't happen though)
+                        pass
 
                     # Check for invalid page and redirect if needed
                     if self.redirect_if_invalid():
@@ -870,7 +993,7 @@ def run_discord_bot():
                         for user in users:
                             total_courses += len(user['courses'])
 
-                        courses_text = "CRN" if total_courses == 1 else "CRNs"
+                        courses_text = "course" if total_courses == 1 else "courses"
                         users_text = "user" if active_users == 1 else "users"
 
                         # Set the custom activity
