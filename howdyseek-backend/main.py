@@ -827,6 +827,8 @@ class HowdySeek:
                     f'CRN: {crn}\n'
                     f'Aggie Schedule Builder: {FALL_2025_URL}'
                 )
+            else: # Irrelevant seat change
+                return
 
             # Send notification
             self._send_notification(webhook, status, message)
