@@ -810,16 +810,18 @@ class HowdySeek:
             # Record the notification
             self._record_notification(user_id, course_id, current_seats, "initial")
 
-        # For subsequent notifications, check if seat count changed
-        elif prev_seats is not None and prev_seats != current_seats:
-            # Determine notification type
-            if current_seats == 0:
+        # For subsequent notifications (prev_seats is not None), only notify if:
+        # 1. Course went from having seats to full (0 seats)
+        # 2. Course went from full (0 seats) to having seats
+        elif prev_seats is not None:
+            # Course became full
+            if prev_seats > 0 and current_seats == 0:
                 notification_type = "full"
                 status = "Section Full"
                 message = f'{course} with {prof} is now full.\nCRN: {crn}'
-            else:
-                notification_type = "change"
-                status = f'Seat Change: {prev_seats} → {current_seats}'
+            elif prev_seats == 0 and current_seats > 0:
+                notification_type = "available"
+                status = f'Seats Available ({current_seats})'
                 message = (
                     f'{course} with {prof} is available.\n'
                     f'CRN: {crn}\n'
@@ -831,9 +833,8 @@ class HowdySeek:
 
             # Record the notification
             self._record_notification(user_id, course_id, current_seats, notification_type)
-        # Handle the case where prev_seats is None, but we need to send a notification
+        # Rare fallback edge case?
         elif prev_seats is None and not is_first_notification and current_seats > 0:
-            # We couldn't determine previous state but still should notify about available seats
             status = f'Seats Available ({current_seats})'
             message = (
                 f'{course} with {prof} is available.\n'
