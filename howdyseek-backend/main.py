@@ -815,11 +815,12 @@ class HowdySeek:
         # 2. Course went from full (0 seats) to having seats
         elif prev_seats is not None:
             # Course became full
-            if prev_seats > 0 and current_seats == 0:
+            if prev_seats > 0 and current_seats <= 0:
                 notification_type = "full"
                 status = "Section Full"
                 message = f'{course} with {prof} is now full.\nCRN: {crn}'
-            elif prev_seats == 0 and current_seats > 0:
+            # Course became available
+            elif prev_seats <= 0 and current_seats > 0:
                 notification_type = "available"
                 status = f'Seats Available ({current_seats})'
                 message = (
