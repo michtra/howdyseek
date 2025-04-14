@@ -80,9 +80,9 @@ class HowdySeek:
     def _setup_webdriver() -> webdriver.Chrome:
         """Configure and return a webdriver."""
         chrome_options = Options()
-        #chrome_options.add_argument("--window-size=1920,1080")
-        #chrome_options.add_argument("--start-maximized")
-        #chrome_options.add_argument("--headless=new")
+        chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument("--start-maximized")
+        chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--no-sandbox")  # bug fix
         chrome_options.add_argument("--disable-extensions")  # bug fix
         chrome_options.add_argument(USER_DATA_DIR_ARG)
@@ -243,31 +243,34 @@ class HowdySeek:
         # Navigate to the term selection page
         self.driver.get(FALL_2025_URL)
 
-        # Select the correct term
-        WebDriverWait(self.driver, 20).until(
-            EC.element_to_be_clickable((By.XPATH, TERM_STRING))
-        ).click()
+        try:
+            # Select the correct term
+            WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, TERM_STRING))
+            ).click()
 
-        # Submit selection
-        WebDriverWait(self.driver, 1).until(
-            EC.element_to_be_clickable((
-                By.XPATH,
-                '//*[@id="scheduler-app"]/div/main/div/div/div/div[2]/div/div/button/span[2]'
-            ))
-        ).click()
+            # Submit selection
+            WebDriverWait(self.driver, 1).until(
+                EC.element_to_be_clickable((
+                    By.XPATH,
+                    '//*[@id="scheduler-app"]/div/main/div/div/div/div[2]/div/div/button/span[2]'
+                ))
+            ).click()
+        except Exception as e:
+            print("Term selection tab did not show up. Moving on...")
 
         # Mark first tab as created
         FIRST_TAB_CREATED = True
 
         # Wait for course list to load
-        WebDriverWait(self.driver, 20).until(
+        WebDriverWait(self.driver, 10).until(
             EC.presence_of_element_located((
                 By.XPATH,
                 '//*[@id="scheduler-app"]/div/main/div/div/div[1]/div/div[4]/div[1]/div[1]/div[1]/div/div[2]'
             ))
         )
 
-        WebDriverWait(self.driver, 20).until(
+        WebDriverWait(self.driver, 10).until(
             EC.presence_of_element_located((
                 By.XPATH,
                 '//*[@id="scheduler-app"]/div/main/div/div/div[2]/div[1]/div/div[2]/table'

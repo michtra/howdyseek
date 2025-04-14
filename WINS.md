@@ -1,4 +1,4 @@
-# Total howdyseek W count: 21
+# Total howdyseek W count: 26
 
 ## Spring 2025
 1. STAT 212 with Patricia Ning (11am section > all)
@@ -24,3 +24,8 @@
 7. ECEN 322 with Iskander
 8. ECEN 322 with Iskander
 9. ECEN 322 with Iskander (triple.)
+10. CSCE 412 with Merchant (1/5 seats sniped!)
+11. CHUPP (GOAT of all GOATs)
+12. KINE 199 Fly Fishing with Wolfe (lol)
+13. ECEN 250 with Braga Neto (dropping your class is NO LONGER SAFE)
+14. STAT 212 with Guha (incoming mickey simulator)
