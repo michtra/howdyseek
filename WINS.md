@@ -1,4 +1,4 @@
-# Total howdyseek W count: 20
+# Total howdyseek W count: 21
 
 ## Spring 2025
 1. STAT 212 with Patricia Ning (11am section > all)
@@ -18,8 +18,9 @@
 1. CSCE 412 with Merchant (average cloud computing enjoyer 💰)
 2. CSCE 465 with Saxena (early bird gets the worm) (howdyseek user got the first seat from this wave)
 3. CSCE 465 with Saxena (another early bird got the worm)
-4. MATH 417 with Kapita (the GOAT)
-5. PHYS 222 with Hans (ECEN majors can't compete)
-6. ECEN 322 with Iskander
+4. CSCE 465 with Saxena (trend #predicted with michaelseek)
+5. MATH 417 with Kapita (the GOAT)
+6. PHYS 222 with Hans (ECEN majors can't compete)
 7. ECEN 322 with Iskander
-8. ECEN 322 with Iskander (triple.)
+8. ECEN 322 with Iskander
+9. ECEN 322 with Iskander (triple.)

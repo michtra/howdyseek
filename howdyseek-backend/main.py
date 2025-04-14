@@ -80,9 +80,9 @@ class HowdySeek:
     def _setup_webdriver() -> webdriver.Chrome:
         """Configure and return a webdriver."""
         chrome_options = Options()
-        chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument("--start-maximized")
-        chrome_options.add_argument("--headless=new")
+        #chrome_options.add_argument("--window-size=1920,1080")
+        #chrome_options.add_argument("--start-maximized")
+        #chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--no-sandbox")  # bug fix
         chrome_options.add_argument("--disable-extensions")  # bug fix
         chrome_options.add_argument(USER_DATA_DIR_ARG)
@@ -986,18 +986,17 @@ def run_discord_bot():
         async def update_status():
             while not termination_event.is_set():
                 try:
-                    response = requests.get(f"{API_BASE_URL}/users/")
-                    if response.status_code == 200:
-                        users = response.json()
+                    users_response = requests.get(f"{API_BASE_URL}/users/")
+                    courses_response = requests.get(f"{API_BASE_URL}/courses/")
+                    if users_response.status_code == 200 and courses_response.status_code == 200:
+                        users = users_response.json()
+                        courses = courses_response.json()
 
                         # Count active users and total courses
                         active_users = len(users)
-                        total_courses = 0
+                        total_courses = len(courses)
 
-                        for user in users:
-                            total_courses += len(user['courses'])
-
-                        courses_text = "course" if total_courses == 1 else "courses"
+                        courses_text = "CRN" if total_courses == 1 else "CRNs"
                         users_text = "user" if active_users == 1 else "users"
 
                         # Set the custom activity
