@@ -860,6 +860,7 @@ class HowdySeek:
             description: The notification description
         """
         discord_json = {
+            "content": "@everyone",
             "embeds": [{"description": description, "title": title}]
         }
 

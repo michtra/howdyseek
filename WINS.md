@@ -1,4 +1,4 @@
-# Total howdyseek W count: 26
+# Total howdyseek W count: 31
 
 ## Spring 2025
 1. STAT 212 with Patricia Ning (11am section > all)
@@ -29,3 +29,8 @@
 12. KINE 199 Fly Fishing with Wolfe (lol)
 13. ECEN 250 with Braga Neto (dropping your class is NO LONGER SAFE)
 14. STAT 212 with Guha (incoming mickey simulator)
+15. MEEN 223 with Not Assigned (MEEN lottery)
+16. MEEN 381 with Aguilar-Mendoza
+17. STAT 404 with Jung (incoming mickey simulator) (W SKY prof)
+18. ECEN 340 with Begovic
+19. PHYS 207 with Nodurft (Don't Panic!)
