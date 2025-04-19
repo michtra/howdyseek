@@ -1,4 +1,4 @@
-# Total howdyseek W count: 31
+# Total howdyseek W count: 37
 
 ## Spring 2025
 1. STAT 212 with Patricia Ning (11am section > all)
@@ -34,3 +34,9 @@
 17. STAT 404 with Jung (incoming mickey simulator) (W SKY prof)
 18. ECEN 340 with Begovic
 19. PHYS 207 with Nodurft (Don't Panic!)
+20. CSCE 331 with Taele (my GOAT)
+21. CSCE 310 with Nguyen (Vietnamese GOAT)
+22. CHEN 304 with Sentmanat (CHEM E WIN)
+23. ISEN 320 with Aprahamian (ISEN WIN)
+24. ECEN 350 with Gratz (CPEN WIN GG)
+25. CSCE 221 with Sueda
